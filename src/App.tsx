@@ -1,0 +1,310 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { TabType, Alarm, RoutineStep, WakeLog, AmbientSound } from './types';
+import { Language, translations } from './utils/translations';
+import { sendAlarmNotification } from './utils/notifications';
+import {
+  loadAlarms,
+  saveAlarms,
+  loadRoutine,
+  saveRoutine,
+  loadLogs,
+  saveLogs,
+  loadAmbients,
+  saveAmbients,
+} from './utils/storage';
+import { Navbar } from './components/Navbar';
+import { AlarmClock } from './components/AlarmClock';
+import { AlarmRingingModal } from './components/AlarmRingingModal';
+import { MorningRoutine } from './components/MorningRoutine';
+import { MorningTab } from './components/MorningTab';
+import { SleepCalculator } from './components/SleepCalculator';
+import { AmbientSoundscape } from './components/AmbientSoundscape';
+import { NightstandClock } from './components/NightstandClock';
+import { WakeStats } from './components/WakeStats';
+import { OnboardingTour } from './components/OnboardingTour';
+import { SettingsView } from './components/SettingsView';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<TabType>('alarms');
+  const [isNightstandMode, setIsNightstandMode] = useState<boolean>(false);
+  // Automatic Launch on Open: When opening the app, the 9-screen wizard tour immediately presents itself
+  const [showTour, setShowTour] = useState<boolean>(true);
+
+  // Language state
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('alarmy_language') as Language) || 'en';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('alarmy_language', language);
+  }, [language]);
+
+  const t = translations[language];
+
+  // Core State
+  const [alarms, setAlarms] = useState<Alarm[]>(loadAlarms);
+  const [routine, setRoutine] = useState<RoutineStep[]>(loadRoutine);
+  const [logs, setLogs] = useState<WakeLog[]>(loadLogs);
+  const [ambients, setAmbients] = useState<AmbientSound[]>(loadAmbients);
+
+  // Active Ringing Alarm
+  const [ringingAlarm, setRingingAlarm] = useState<Alarm | null>(null);
+  const [lastTriggeredTime, setLastTriggeredTime] = useState<string>('');
+
+  // Persist State Updates
+  useEffect(() => saveAlarms(alarms), [alarms]);
+  useEffect(() => saveRoutine(routine), [routine]);
+  useEffect(() => saveLogs(logs), [logs]);
+  useEffect(() => saveAmbients(ambients), [ambients]);
+
+  // Global Alarm Checker Loop (runs every second)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const currentHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const currentDay = now.getDay(); // 0-6
+
+      if (currentHHMM !== lastTriggeredTime) {
+        // Check if any enabled alarm matches current time and day
+        const matchingAlarm = alarms.find((a) => {
+          if (!a.enabled) return false;
+          if (a.time !== currentHHMM) return false;
+          if (a.repeatDays.length > 0 && !a.repeatDays.includes(currentDay)) return false;
+          return true;
+        });
+
+        if (matchingAlarm) {
+          setRingingAlarm(matchingAlarm);
+          setLastTriggeredTime(currentHHMM);
+          sendAlarmNotification(matchingAlarm.label || 'WakeUp Alarm', matchingAlarm.time);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [alarms, lastTriggeredTime]);
+
+  // Next Alarm Time helper
+  const getNextAlarmTime = (): string | null => {
+    const enabledAlarms = alarms.filter((a) => a.enabled);
+    if (enabledAlarms.length === 0) return null;
+    const sorted = [...enabledAlarms].sort((a, b) => a.time.localeCompare(b.time));
+    return sorted[0].time;
+  };
+
+  // Handlers for Alarms
+  const handleAddAlarm = (newAlarmData: Omit<Alarm, 'id' | 'snoozeCount'>) => {
+    const newAlarm: Alarm = {
+      ...newAlarmData,
+      id: Date.now().toString(),
+      snoozeCount: 0,
+    };
+    setAlarms([...alarms, newAlarm]);
+  };
+
+  const handleUpdateAlarm = (updatedAlarm: Alarm) => {
+    setAlarms(alarms.map((a) => (a.id === updatedAlarm.id ? updatedAlarm : a)));
+  };
+
+  const handleDeleteAlarm = (id: string) => {
+    setAlarms(alarms.filter((a) => a.id !== id));
+  };
+
+  const handleSetQuickAlarm = (time: string, label: string) => {
+    const existing = alarms.find((a) => a.time === time);
+    if (existing) {
+      setAlarms(alarms.map((a) => (a.id === existing.id ? { ...a, enabled: true, label } : a)));
+    } else {
+      handleAddAlarm({
+        time,
+        label,
+        enabled: true,
+        repeatDays: [0, 1, 2, 3, 4, 5, 6],
+        sound: 'sunrise',
+        volume: 80,
+        challenge: 'math',
+        challengeDifficulty: 'easy',
+      });
+    }
+  };
+
+  // Handlers for Routine
+  const handleToggleStep = (id: string) => {
+    setRoutine(routine.map((r) => (r.id === id ? { ...r, completed: !r.completed } : r)));
+  };
+
+  const handleAddStep = (stepData: Omit<RoutineStep, 'id' | 'completed'>) => {
+    const newStep: RoutineStep = {
+      ...stepData,
+      id: Date.now().toString(),
+      completed: false,
+    };
+    setRoutine([...routine, newStep]);
+  };
+
+  const handleDeleteStep = (id: string) => {
+    setRoutine(routine.filter((r) => r.id !== id));
+  };
+
+  const handleResetRoutine = () => {
+    setRoutine(routine.map((r) => ({ ...r, completed: false })));
+  };
+
+  // Handlers for Logs
+  const handleAddLog = (logData: Omit<WakeLog, 'id'>) => {
+    const newLog: WakeLog = {
+      ...logData,
+      id: Date.now().toString(),
+    };
+    setLogs([newLog, ...logs]);
+  };
+
+  // Snooze Alarm
+  const handleSnooze = (minutes: number) => {
+    if (!ringingAlarm) return;
+    const now = new Date();
+    const future = new Date(now.getTime() + minutes * 60000);
+    const snoozeTime = `${future.getHours().toString().padStart(2, '0')}:${future.getMinutes().toString().padStart(2, '0')}`;
+
+    const snoozedAlarm: Alarm = {
+      ...ringingAlarm,
+      id: Date.now().toString(),
+      time: snoozeTime,
+      label: `${ringingAlarm.label} (Snoozed)`,
+      enabled: true,
+      snoozeCount: ringingAlarm.snoozeCount + 1,
+    };
+
+    setAlarms([...alarms, snoozedAlarm]);
+    setRingingAlarm(null);
+  };
+
+  // Automatic Launch on Open: render onboarding tour first before dashboard
+  if (showTour) {
+    return (
+      <OnboardingTour
+        onComplete={(newAlarm) => {
+          if (newAlarm) handleAddAlarm(newAlarm);
+          setShowTour(false);
+        }}
+        onClose={() => setShowTour(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
+      {/* Navbar Header */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        nextAlarmTime={getNextAlarmTime()}
+        toggleNightstand={() => setIsNightstandMode(true)}
+        language={language}
+        setLanguage={setLanguage}
+      />
+
+      {/* Main Content Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-hidden">
+        <AnimatePresence mode="wait">
+          {(activeTab === 'alarm' || activeTab === 'alarms') && (
+            <motion.div
+              key="alarm"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <AlarmClock
+                alarms={alarms}
+                onAddAlarm={handleAddAlarm}
+                onUpdateAlarm={handleUpdateAlarm}
+                onDeleteAlarm={handleDeleteAlarm}
+                nextAlarmTime={getNextAlarmTime()}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'sleep' && (
+            <motion.div
+              key="sleep"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <SleepCalculator onSetAlarm={handleSetQuickAlarm} />
+            </motion.div>
+          )}
+
+          {(activeTab === 'morning' || activeTab === 'routine') && (
+            <motion.div
+              key="morning"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <MorningTab
+                routine={routine}
+                onToggleStep={handleToggleStep}
+                onSelectTab={setActiveTab}
+              />
+            </motion.div>
+          )}
+
+          {(activeTab === 'report' || activeTab === 'stats') && (
+            <motion.div
+              key="report"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <WakeStats
+                logs={logs}
+                onAddLog={handleAddLog}
+                onSetAlarmClick={() => setActiveTab('alarm')}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'settings' && (
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              <SettingsView
+                language={language}
+                setLanguage={setLanguage}
+                onLaunchNightstand={() => setIsNightstandMode(true)}
+                onRelaunchTour={() => setShowTour(true)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Fullscreen Nightstand Clock Overlay */}
+      {isNightstandMode && (
+        <NightstandClock
+          onClose={() => setIsNightstandMode(false)}
+          nextAlarmTime={getNextAlarmTime()}
+        />
+      )}
+
+      {/* Ringing Alarm Modal */}
+      {ringingAlarm && (
+        <AlarmRingingModal
+          alarm={ringingAlarm}
+          onDismiss={() => setRingingAlarm(null)}
+          onSnooze={handleSnooze}
+        />
+      )}
+    </div>
+  );
+}

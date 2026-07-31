@@ -1,0 +1,6 @@
+{
+  "name": "WakeUp - Smart Alarm & Morning Routine",
+  "description": "Smart alarm clock with wake-up challenges, morning routine planner, sleep cycle calculator, and ambient sounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
