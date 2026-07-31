@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sun, MapPin, Sparkles, ChevronRight, CheckSquare, RefreshCw, Trophy, Heart } from 'lucide-react';
 import { PetState, MoodLog, TarotCard, RoutineStep } from '../types';
+import { MorningInspiration } from './MorningInspiration';
 
 interface MorningTabProps {
   routine: RoutineStep[];
@@ -70,6 +71,9 @@ export const MorningTab: React.FC<MorningTabProps> = ({
           <ChevronRight className="w-5 h-5 text-slate-400 inline" />
         </button>
       </div>
+
+      {/* Morning Inspiration Component */}
+      <MorningInspiration />
 
       {/* Weather Widget Card matching Image 3 */}
       <div className="bg-gradient-to-b from-[#2a3b5c] to-[#1c2840] border border-blue-500/20 rounded-3xl p-5 shadow-xl text-white space-y-4 relative">

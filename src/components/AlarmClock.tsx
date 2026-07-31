@@ -6,6 +6,7 @@ import { Plus, Trash2, Volume2, Bell, Clock, Edit2, Play, Square, Shield, Sparkl
 import { RingtonePickerModal } from './RingtonePickerModal';
 import { QuickAlarmModal } from './QuickAlarmModal';
 import { HabitAlarmWizardModal } from './HabitAlarmWizardModal';
+import { MorningInspiration } from './MorningInspiration';
 import { getNotificationStatus, requestNotificationPermission, NotificationStatus } from '../utils/notifications';
 
 interface AlarmClockProps {
@@ -212,6 +213,9 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         </div>
         <ChevronRight className="w-5 h-5 text-slate-500" />
       </div>
+
+      {/* Centered Morning Inspiration Quote Widget */}
+      <MorningInspiration />
 
       {/* Notification Banner if permission not granted */}
       {notifStatus.permission !== 'granted' && (
