@@ -38,7 +38,8 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Capacitor 8's CLI declares "engines": { "node": ">=22.0.0" }.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install web dependencies
@@ -56,8 +57,10 @@ jobs:
 
       # Recreates the git-ignored Capacitor glue (cordova plugin module,
       # copied web assets, capacitor.config.json) and refreshes plugins.
+      # --no-install keeps it on the CLI pinned by package-lock.json instead of
+      # letting npx resolve a different version from the registry.
       - name: Sync the web bundle into the Android project
-        run: npx cap sync android
+        run: npx --no-install cap sync android
 
       - name: Restore the release signing keystore
         env:
@@ -82,16 +85,43 @@ jobs:
             echo "::warning::Signing secrets are not set, so the APK is built with the debug key. Add ANDROID_KEYSTORE_BASE64 (+ ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD) to ship a signed release APK."
           fi
 
-      - name: Assemble the APK
+      - name: Android SDK environment
         run: |
-          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          {
+            echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+            echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+            echo "sdk dir: $SDK"
+            echo "sdk contents: $(ls -1 "$SDK" 2>&1 | tr '\n' ' ')"
+            echo "platforms: $(ls -1 "$SDK/platforms" 2>&1 | tr '\n' ' ')"
+            echo "build-tools: $(ls -1 "$SDK/build-tools" 2>&1 | tr '\n' ' ')"
+          } | while IFS= read -r line; do echo "::notice::$line"; done
+
+      - name: Assemble the APK
+        id: assemble
+        run: |
+          set -o pipefail
           cd android
           chmod +x gradlew
           if [ "$BUILD_TYPE" = "debug" ]; then
-            ./gradlew --no-daemon assembleDebug
+            ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee gradle.log
           else
-            ./gradlew --no-daemon assembleRelease
+            ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee gradle.log
           fi
+
+      # The interesting part of a Gradle failure is echoed as job annotations so
+      # it is readable straight from the run without downloading the full log.
+      - name: Report the Gradle failure
+        if: failure() && steps.assemble.outcome == 'failure'
+        run: |
+          set -uo pipefail
+          if [ ! -f android/gradle.log ]; then
+            echo "::error::Gradle produced no log file"
+            exit 0
+          fi
+          awk '/What went wrong:/{f=1} f {print "::error::" $0} f && /^\* Try:/{exit}' android/gradle.log | head -30
+          grep -i -m 12 -E 'SDK location|licen[cs]es|Could not (find|resolve|download)|Unsupported class file|minimum supported|No matching variant|Could not determine' android/gradle.log \
+            | while IFS= read -r line; do echo "::error::$line"; done
 
       - name: Locate the APK
         id: apk
