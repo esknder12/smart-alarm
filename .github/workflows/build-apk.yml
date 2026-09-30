@@ -1,0 +1,124 @@
+name: Build APK
+
+on:
+  # Manual runs: Actions -> "Build APK" -> Run workflow (pick release or debug).
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Gradle variant to assemble'
+        required: false
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Assemble Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BUILD_TYPE: ${{ github.event.inputs.build_type || 'release' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build the web bundle
+        run: npm run build
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      # Recreates the git-ignored Capacitor glue (cordova plugin module,
+      # copied web assets, capacitor.config.json) and refreshes plugins.
+      - name: Sync the web bundle into the Android project
+        run: npx cap sync android
+
+      - name: Restore the release signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ] && [ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ]; then
+            mkdir -p android/signing
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/signing/niqu.keystore
+            {
+              echo "storeFile=signing/niqu.keystore"
+              echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+              echo "keyAlias=${ANDROID_KEY_ALIAS:-niqu}"
+              echo "keyPassword=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+              echo "storeType=JKS"
+            } > android/signing/keystore.properties
+            echo "Release APK will be signed with alias '${ANDROID_KEY_ALIAS:-niqu}'."
+          else
+            echo "::warning::Signing secrets are not set, so the APK is built with the debug key. Add ANDROID_KEYSTORE_BASE64 (+ ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD) to ship a signed release APK."
+          fi
+
+      - name: Assemble the APK
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            ./gradlew --no-daemon assembleDebug
+          else
+            ./gradlew --no-daemon assembleRelease
+          fi
+
+      - name: Locate the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "::error::No APK was produced under android/app/build/outputs/apk"
+            exit 1
+          fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$APK")" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Build APK"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Variant | \`${BUILD_TYPE}\` |"
+            echo "| Artifact | \`$(basename "$APK")\` |"
+            echo "| Size | $(du -h "$APK" | cut -f1) |"
+            echo "| SHA-256 | \`$(sha256sum "$APK" | cut -d' ' -f1)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: niqu-${{ env.BUILD_TYPE }}-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
