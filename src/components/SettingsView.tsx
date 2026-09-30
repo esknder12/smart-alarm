@@ -4,6 +4,7 @@ import {
   User,
   Shield,
   ShieldCheck,
+  ShieldAlert,
   ChevronRight,
   Sparkles,
   Volume2,
@@ -28,6 +29,7 @@ import {
   Send
 } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
+import { APP_NAME, APP_VERSION } from '../constants';
 import {
   getNotificationStatus,
   requestNotificationPermission,
@@ -173,6 +175,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500" />
           </label>
         </div>
+
+        {/* Row 5: Strict volume lock */}
+        <button
+          onClick={() => setActiveModal('volume_lock')}
+          className="w-full p-3.5 flex items-center justify-between hover:bg-slate-800/40 rounded-2xl transition"
+        >
+          <div className="flex items-center space-x-3.5">
+            <div className="w-5 h-5 text-amber-400 flex items-center justify-center">
+              <Lock className="w-5 h-5" />
+            </div>
+            <span className="font-bold text-sm text-slate-100">
+              {isAm ? 'የድምፅ መቀነሻ ጠንካራ መቆለፊያ' : 'Strict Volume Lock'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
+            <span className="text-xs font-mono text-emerald-400">
+              • {isAm ? 'ሁልጊዜ በራ' : 'ALWAYS ON'}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+        </button>
       </div>
 
       {/* Main Settings List Group 1 */}
@@ -394,7 +417,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <div className="w-12 h-12 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mx-auto text-2xl">
                       👑
                     </div>
-                    <h4 className="text-base font-bold text-white">WakeUp Alarm Pro</h4>
+                    <h4 className="text-base font-bold text-white">{APP_NAME} Pro</h4>
                     <p className="text-slate-400">Unlock cheat prevention, custom MP3 uploads, and unlimited habit missions.</p>
                   </div>
 
@@ -439,6 +462,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       {selectedTheme === th && <Check className="w-4 h-4" />}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Strict Volume Lock Modal */}
+              {activeModal === 'volume_lock' && (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 rounded-2xl border bg-amber-500/10 border-amber-500/30 flex items-start space-x-3">
+                    <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-sm text-amber-300">
+                        {isAm ? 'የድምፅ መቀነሻ ተቆልፏል — ፈተናውን እስኪጨርሱ ድረስ' : 'Volume down is locked until the mission is solved'}
+                      </div>
+                      <p className="text-slate-300 mt-1 leading-relaxed">
+                        {isAm
+                          ? 'ማንቂያው ሲደውል የድምፅ መቀነሻ እና የዝምታ ቁልፎች ተይዘው አይሰሩም። ድምፅ መቀነስ ከሞከሩ ማንቂያው ይበልጥ ይጮሃል።'
+                          : 'While the alarm rings, volume-down and mute keys are swallowed and ignored. Trying to turn the alarm down makes it louder instead.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-slate-900 border-slate-800 space-y-2">
+                    <div className="font-bold text-slate-200">
+                      {isAm ? 'በማንቂያ ጊዜ የሚከለከሉ' : 'Blocked while ringing'}
+                    </div>
+                    {[
+                      isAm ? 'የድምፅ መቀነሻ / ዝምታ ቁልፎች (keydown, capture phase)' : 'Volume-down / mute keys (keydown, capture phase)',
+                      isAm ? 'የጆሮ ማዳመጫ እና የሎክ ስክሪን መቆጣጠሪያዎች (MediaSession)' : 'Headset & lock-screen transport controls (MediaSession)',
+                      isAm ? 'የድምፅ ማቀፊያ መቆም (AudioContext watchdog በየ200ms)' : 'AudioContext suspension / background throttling (200 ms watchdog)',
+                      isAm ? 'የቪዲዮ/ድምፅ ኤለመንት mute እና volume መቀነስ' : 'Media element mute / volume reduction',
+                      isAm ? 'በፈተና ሳይጠናቀቅ snooze ማድረግ' : 'Snoozing before the mission is solved',
+                      isAm ? 'ማንቂያው እየደወለ ገፁን መዝጋት/መጫን' : 'Closing or reloading the page while ringing',
+                    ].map((item) => (
+                      <div key={item} className="flex items-start space-x-2 text-slate-300">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span className="leading-relaxed">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 rounded-2xl border bg-slate-900 border-slate-800 space-y-2">
+                    <div className="font-bold text-slate-200">
+                      {isAm ? 'የድምፅ ጭማሪ ደረጃዎች' : 'Loudness escalation ladder'}
+                    </div>
+                    {[
+                      isAm ? '0-30 ሰከንድ — የተቀመጠው ድምፅ' : '0-30 s — configured volume',
+                      isAm ? '30 ሰከንድ — ከፍተኛ ጩኸት (+15%)' : '30 s — maximum gain (+15%)',
+                      isAm ? '60 ሰከንድ — አስደንጋጭ ሲረን ይጨመራል' : '60 s — piercing siren layer added',
+                      isAm ? '90 ሰከንድ — ሲረን + ከፍተኛ ጩኸት' : '90 s — siren + maximum gain',
+                    ].map((item, i) => (
+                      <div key={item} className="flex items-start space-x-2 text-slate-300">
+                        <span className={`w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center shrink-0 mt-0.5 ${
+                          ['bg-emerald-500/20 text-emerald-300', 'bg-amber-500/20 text-amber-300', 'bg-orange-500/20 text-orange-300', 'bg-rose-500/20 text-rose-300'][i]
+                        }`}>{i}</span>
+                        <span className="leading-relaxed">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Honest platform limitation */}
+                  <div className="p-4 rounded-2xl border bg-rose-500/10 border-rose-500/30">
+                    <div className="font-bold text-rose-300 flex items-center space-x-2">
+                      <ShieldAlert className="w-4 h-4" />
+                      <span>{isAm ? 'ግልጽ ማብራሪያ' : 'Honest limitation'}</span>
+                    </div>
+                    <p className="text-slate-300 mt-1.5 leading-relaxed">
+                      {isAm
+                        ? 'የስልኩ አካላዊ የድምፅ ቁልፍ (volume rocker) በስርዓቱ ላይ በቀጥታ ስለሚሰራ የዌብ መተግበሪያ ሊይዘው አይችልም። ስለዚህ መተግበሪያው የሚችለውን ሁሉ ይቆልፋል፣ እንዲሁም ድምፅ ሲቀነስ ማንቂያውን የበለጠ ያጮሃል፣ ሲረን ይጨምራል፣ ስክሪኑን አብርቶ ይይዛል እና ስልኩ ይንቀጠቀጣል።'
+                        : 'The phone\'s physical volume rocker is handled by the operating system before the page ever sees it, so a web app cannot block it — that needs a native app with system audio-session control. This app therefore blocks everything a browser exposes, and when the alarm is silenced it fights back: louder gain, a siren layer, a held screen wake lock and repeated vibration.'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setActiveModal(null)}
+                    className="w-full bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl font-bold text-white transition"
+                  >
+                    {isAm ? 'ገባኝ' : 'Got it'}
+                  </button>
                 </div>
               )}
 
@@ -489,7 +589,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
 
                     <p className="text-slate-400 leading-relaxed">
-                      Allowing browser notifications lets WakeUp Alarm ring and pop up desktop alerts even when the tab is running in the background.
+                      Allowing browser notifications lets {APP_NAME} ring and pop up desktop alerts even when the tab is running in the background.
                     </p>
 
                     {notifStatus.permission !== 'granted' ? (
@@ -591,7 +691,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {activeModal === 'about' && (
                 <div className="space-y-3 text-xs text-slate-300 text-center">
                   <div className="text-3xl">⏰</div>
-                  <h4 className="font-bold text-sm text-white">WakeUp Alarm v2.5.0</h4>
+                  <h4 className="font-bold text-sm text-white">{APP_NAME} v{APP_VERSION}</h4>
                   <p className="text-slate-400">Built with React, Vite, and Web Audio API.</p>
                   <div className="pt-2">
                     <button

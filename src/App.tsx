@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { TabType, Alarm, RoutineStep, WakeLog, AmbientSound } from './types';
 import { Language, translations } from './utils/translations';
 import { sendAlarmNotification } from './utils/notifications';
+import { APP_NAME } from './constants';
 import {
   loadAlarms,
   saveAlarms,
@@ -76,7 +77,7 @@ export default function App() {
         if (matchingAlarm) {
           setRingingAlarm(matchingAlarm);
           setLastTriggeredTime(currentHHMM);
-          sendAlarmNotification(matchingAlarm.label || 'WakeUp Alarm', matchingAlarm.time);
+          sendAlarmNotification(matchingAlarm.label || APP_NAME, matchingAlarm.time);
         }
       }
     }, 1000);

@@ -1,4 +1,6 @@
-// Browser Notification Utility for WakeUp Alarm App
+// Browser Notification Utility for the Niqu ንቁ App
+
+import { APP_NAME } from '../constants';
 
 export interface NotificationStatus {
   isSupported: boolean;
@@ -71,7 +73,7 @@ export const sendTestNotification = (): boolean => {
   if (Notification.permission === 'granted') {
     try {
       const notification = new Notification('🔔 Notifications Enabled!', {
-        body: 'WakeUp Alarm will notify you even when the tab is in the background.',
+        body: `${APP_NAME} will notify you even when the tab is in the background.`,
         icon: 'https://images.unsplash.com/photo-1508962914676-134849a727f0?w=128&auto=format&fit=crop&q=80',
       });
       setTimeout(() => notification.close(), 5000);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TabType } from '../types';
 import { AlarmClock, Sun, Moon, Settings, FileText, Sparkles, ChevronRight, Globe } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
+import { APP_NAME } from '../constants';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -51,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 text-white border border-slate-700 font-black text-xs">
               <Sparkles className="w-3.5 h-3.5 text-white" />
-              <span>WakeUp Alarm</span>
+              <span>{APP_NAME}</span>
             </div>
           </div>
 

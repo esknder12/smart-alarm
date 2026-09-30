@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Alarm, ChallengeType } from '../types';
 import { audioEngine } from '../utils/audio';
+import { volumeLock, VolumeLockStatus, VOLUME_LOCK_BLOCKED_EVENT } from '../utils/volumeLock';
 import { WALLPAPERS } from './AlarmClock';
 import { Language } from '../utils/translations';
-import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock } from 'lucide-react';
+import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX } from 'lucide-react';
 
 interface AlarmRingingModalProps {
   alarm: Alarm;
@@ -21,6 +22,8 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 }) => {
   const isAm = language === 'am';
   const [volumeAttemptBlocked, setVolumeAttemptBlocked] = useState<boolean>(false);
+  const [lockStatus, setLockStatus] = useState<VolumeLockStatus | null>(null);
+  const [snoozeBlocked, setSnoozeBlocked] = useState<boolean>(false);
   const [challengePassed, setChallengePassed] = useState<boolean>(alarm.challenge === 'none');
   const [mathProblem, setMathProblem] = useState<{ question: string; answer: number }>({ question: '', answer: 0 });
   const [userMathInput, setUserMathInput] = useState<string>('');
@@ -35,7 +38,9 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 
   // Shake Challenge State
   const [shakeCount, setShakeCount] = useState<number>(0);
-  const targetShakes = 15;
+  // Shake mission scales with the difficulty the user picked.
+  const targetShakes =
+    alarm.challengeDifficulty === 'hard' ? 40 : alarm.challengeDifficulty === 'medium' ? 25 : 15;
 
   // Auto-fade progress tracking
   const [fadeProgressSec, setFadeProgressSec] = useState<number>(0);
@@ -104,40 +109,42 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     }
   }, [challengePassed]);
 
-  // Intercept and disable Volume Down and Mute key presses during ringing until alarm is disabled
+  /**
+   * Strict Volume Lock.
+   * Swallows volume-down/mute keys, keeps the AudioContext awake and loud,
+   * re-mutes-proofs media elements, hijacks MediaSession controls, holds a
+   * screen wake lock and escalates loudness while the challenge is unsolved.
+   */
   useEffect(() => {
-    const handleVolumeLock = (e: KeyboardEvent) => {
-      const isVolKey =
-        e.key === 'AudioVolumeDown' ||
-        e.key === 'VolumeDown' ||
-        e.key === 'AudioVolumeMute' ||
-        e.key === 'VolumeMute' ||
-        e.code === 'AudioVolumeDown' ||
-        e.code === 'VolumeDown' ||
-        e.code === 'AudioVolumeMute' ||
-        e.code === 'VolumeMute' ||
-        e.key === '-' ||
-        e.key === 'PageDown' ||
-        (e.key === 'ArrowDown' && (e.altKey || e.ctrlKey || e.metaKey));
+    volumeLock.engage({
+      volumePercent: alarm.volume,
+      escalation: true,
+      haptics: true,
+    });
 
-      if (isVolKey) {
-        e.preventDefault();
-        e.stopPropagation();
+    const unsubscribe = volumeLock.subscribe((status) => {
+      setLockStatus(status);
+      if (status.blockedAttempts > 0) {
         setVolumeAttemptBlocked(true);
-        if ('vibrate' in navigator) {
-          try { navigator.vibrate([150, 80, 150]); } catch (err) {}
-        }
-        setTimeout(() => setVolumeAttemptBlocked(false), 3000);
       }
-    };
+    });
 
-    window.addEventListener('keydown', handleVolumeLock, true);
-    window.addEventListener('keyup', handleVolumeLock, true);
+    const onBlocked = () => setVolumeAttemptBlocked(true);
+    window.addEventListener(VOLUME_LOCK_BLOCKED_EVENT, onBlocked);
+
     return () => {
-      window.removeEventListener('keydown', handleVolumeLock, true);
-      window.removeEventListener('keyup', handleVolumeLock, true);
+      window.removeEventListener(VOLUME_LOCK_BLOCKED_EVENT, onBlocked);
+      unsubscribe();
+      volumeLock.disengage();
     };
-  }, []);
+  }, [alarm.id, alarm.volume]);
+
+  // Auto-hide the "volume locked" toast after a few seconds
+  useEffect(() => {
+    if (!volumeAttemptBlocked) return;
+    const timer = setTimeout(() => setVolumeAttemptBlocked(false), 4000);
+    return () => clearTimeout(timer);
+  }, [volumeAttemptBlocked, lockStatus?.blockedAttempts]);
 
   const handleShake = () => {
     if ('vibrate' in navigator) {
@@ -230,10 +237,20 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
   };
 
   const handleSnoozeWithHaptic = (mins: number) => {
+    // Anti-cheat: snoozing without solving the mission is just going back to
+    // sleep, so snooze stays locked until the challenge is passed.
+    if (!challengePassed) {
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate([150, 80, 150]); } catch (e) {}
+      }
+      setSnoozeBlocked(true);
+      return;
+    }
     if ('vibrate' in navigator) {
       try { navigator.vibrate(100); } catch (e) {}
     }
     audioEngine.stopAlarmSound();
+    volumeLock.disengage();
     onSnooze(mins);
   };
 
@@ -242,6 +259,9 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
       try { navigator.vibrate([150, 50, 200]); } catch (e) {}
     }
     audioEngine.stopAlarmSound();
+    // Release the strict volume lock only once the user has solved the
+    // challenge and switched the alarm off.
+    volumeLock.disengage();
     onDismiss();
   };
 
@@ -274,24 +294,81 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
           </div>
 
           {/* High Security Volume Lock Badge */}
-          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left flex items-center justify-between shadow-md">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                <VolumeX className="w-4.5 h-4.5 animate-pulse" />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-amber-300 flex items-center space-x-1">
-                  <span>{isAm ? 'የድምፅ መቀነሻ ተቆልፏል' : 'Volume Down Disabled'}</span>
-                  <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">
-                    {isAm ? 'ተቆልፏል' : 'LOCKED'}
-                  </span>
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left shadow-md space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                  <VolumeX className="w-4.5 h-4.5 animate-pulse" />
                 </div>
-                <div className="text-[10px] text-slate-300 mt-0.5">
-                  {isAm
-                    ? 'ድምፅ መቀነስ አይቻልም። ፈተናውን ፈፅመው ማንቂያውን ሲያጠፉ ይከፈታል።'
-                    : 'Volume down is locked until challenge is finished & alarm is disabled'}
+                <div>
+                  <div className="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                    <span>{isAm ? 'የድምፅ መቀነሻ ተቆልፏል' : 'Volume Down Disabled'}</span>
+                    <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">
+                      {isAm ? 'ተቆልፏል' : 'LOCKED'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 mt-0.5">
+                    {isAm
+                      ? 'ድምፅ መቀነስ አይቻልም። ፈተናውን ፈፅመው ማንቂያውን ሲያጠፉ ይከፈታል።'
+                      : 'Volume down is locked until challenge is finished & alarm is disabled'}
+                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Live lock telemetry: proof the guard is actually running */}
+            <div className="grid grid-cols-2 gap-1.5 text-[9px] font-bold">
+              {[
+                { label: isAm ? 'የቁልፍ ጠባቂ' : 'Key guard', on: lockStatus?.keyGuardActive ?? false },
+                { label: isAm ? 'የድምፅ ጠባቂ' : 'Audio watchdog', on: lockStatus?.audioWatchdogActive ?? false },
+                { label: isAm ? 'ሜዲያ መቆለፊያ' : 'MediaSession lock', on: lockStatus?.mediaSessionLocked ?? false },
+                { label: isAm ? 'ማያ ጠባቂ' : 'Screen wake lock', on: lockStatus?.wakeLockHeld ?? false },
+              ].map((item) => (
+                <span
+                  key={item.label}
+                  className={`flex items-center space-x-1 px-1.5 py-1 rounded-lg border ${
+                    item.on
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${item.on ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                  <span className="truncate">{item.label}</span>
+                </span>
+              ))}
+            </div>
+
+            {/* Loudness escalation ladder */}
+            <div className="pt-1 border-t border-amber-500/20">
+              <div className="flex items-center justify-between text-[9px] font-bold mb-1">
+                <span className="text-amber-300 flex items-center space-x-1">
+                  <ShieldX className="w-3 h-3" />
+                  <span>{isAm ? 'የድምፅ ጭማሪ ደረጃ' : 'Loudness escalation'}</span>
+                </span>
+                <span className="font-mono text-slate-300">
+                  {isAm ? 'ደረጃ' : 'Level'} {lockStatus?.escalationLevel ?? 0}/3
+                  {lockStatus && lockStatus.blockedAttempts > 0 && (
+                    <span className="text-rose-400"> · {lockStatus.blockedAttempts} {isAm ? 'እገዳ' : 'blocked'}</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex space-x-1">
+                {[0, 1, 2, 3].map((step) => (
+                  <span
+                    key={step}
+                    className={`h-1.5 flex-1 rounded-full ${
+                      (lockStatus?.escalationLevel ?? 0) >= step
+                        ? ['bg-emerald-400', 'bg-amber-400', 'bg-orange-500', 'bg-rose-500'][step]
+                        : 'bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-[9px] text-slate-400 mt-1 leading-relaxed">
+                {isAm
+                  ? 'ማንቂያው ሳይጠፋ ሲቀር 30 ሰከንድ ሲሞላ ድምፁ ይጨምራል፣ 60 ሰከንድ ሲሞላ አስደንጋጭ ሲረን ይጨመራል።'
+                  : 'Loudness rises at 30s and a piercing siren layer kicks in at 60s until the alarm is dismissed.'}
+              </p>
             </div>
           </div>
 
@@ -501,11 +578,36 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
             <button
               id="btn-snooze-alarm"
               onClick={() => handleSnoozeWithHaptic(9)}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3.5 rounded-2xl transition flex items-center justify-center space-x-2 border border-slate-700/80"
+              aria-disabled={!challengePassed}
+              className={`w-full font-semibold py-3.5 rounded-2xl transition flex items-center justify-center space-x-2 border ${
+                challengePassed
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/80'
+                  : 'bg-slate-900/80 text-slate-500 border-slate-800 cursor-not-allowed'
+              }`}
             >
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>{isAm ? 'አጥፋና ከ9 ደቂቃ በኋላ ድገም' : 'Snooze 9 Minutes'}</span>
+              {challengePassed ? (
+                <Clock className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Lock className="w-4 h-4 text-rose-400" />
+              )}
+              <span>
+                {challengePassed
+                  ? (isAm ? 'አጥፋና ከ9 ደቂቃ በኋላ ድገም' : 'Snooze 9 Minutes')
+                  : (isAm ? 'ድጋሚ ማንቂያ ተቆልፏል — ፈተናውን ይጨርሱ' : 'Snooze locked — solve the mission first')}
+              </span>
             </button>
+
+            {snoozeBlocked && !challengePassed && (
+              <motion.p
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-[10px] text-rose-300 font-bold text-center"
+              >
+                {isAm
+                  ? 'ያለ ፈተና መተኛት አይቻልም! አእምሮዎን ለማንቃት ፈተናውን ይጨርሱ።'
+                  : 'No sleep without the mission! Finish the challenge to wake your brain up.'}
+              </motion.p>
+            )}
           </div>
         </div>
       </motion.div>
