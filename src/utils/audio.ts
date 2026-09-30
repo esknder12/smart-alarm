@@ -9,6 +9,26 @@ class AudioEngine {
   private volumeLocked: boolean = false;
   private lockedVolumePercent: number = 100;
 
+  // ---- Strict volume-lock loudness bus -------------------------------------
+  /** Master bus every alarm tone is routed through, so loudness can be forced. */
+  private alarmBus: GainNode | null = null;
+  /** Alarm's configured volume as a 0-1 gain. */
+  private alarmBusBaseGain: number = 1;
+  /** 0 = base, 1 = max gain, 2 = + siren layer, 3 = siren + max gain. */
+  private escalationLevel: number = 0;
+  private sirenNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
+  private sirenLfo: OscillatorNode | null = null;
+  /** Last started alarm tone, so the watchdog can re-arm it if it is killed. */
+  private currentTone: {
+    type: string;
+    volume: number;
+    gentle: boolean;
+    onFade?: (elapsedSec: number, currentPercent: number) => void;
+  } | null = null;
+
+  /** Per-level loudness multiplier applied on top of the configured volume. */
+  private static readonly ESCALATION_BOOST = [1, 1.15, 1.3, 1.45];
+
   private getContext(): AudioContext {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -30,6 +50,15 @@ class AudioEngine {
     this.stopAlarmSound();
     this.volumeLocked = true;
     this.lockedVolumePercent = volume;
+    this.alarmBusBaseGain = Math.max(0.05, Math.min(1, volume / 100));
+
+    // Remember the tone so the volume-lock watchdog can re-arm it if the
+    // browser kills the loop while the alarm is still ringing.
+    this.currentTone = { type, volume, gentle: gentleWakeUp, onFade: onFadeProgress };
+
+    // Alarm tones are routed through this bus instead of straight to the
+    // speakers, so the lock can re-assert loudness at any time.
+    const alarmOut = this.ensureAlarmBus();
 
     // Register MediaSession lock to prevent volume or pause suppression from media keys
     if ('mediaSession' in navigator) {
@@ -54,7 +83,10 @@ class AudioEngine {
     }
 
     const ctx = this.getContext();
-    let targetVol = Math.max(0, Math.min(1, volume / 100));
+
+    // Tones are synthesised at full scale; the configured volume and the
+    // escalation boost are applied once, on the master alarm bus below.
+    const targetVol = 1;
     let currentVol = gentleWakeUp ? 0.05 : targetVol;
 
     if (gentleWakeUp) {
@@ -91,7 +123,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.3, now + i * 0.25);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.25 + 0.8);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.25);
           osc.stop(now + i * 0.25 + 0.8);
         });
@@ -105,7 +137,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.25, now + i * 0.3);
           gain.gain.linearRampToValueAtTime(0.001, now + i * 0.3 + 1.2);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.3);
           osc.stop(now + i * 0.3 + 1.2);
         });
@@ -118,7 +150,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.25, now + delay);
           gain.gain.setValueAtTime(0, now + delay + 0.08);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + delay);
           osc.stop(now + delay + 0.08);
         });
@@ -135,7 +167,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.5, now + 0.55);
           gain.gain.linearRampToValueAtTime(0.001, now + 0.6);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 0.6);
         });
@@ -151,7 +183,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.45, now + 0.35);
           gain.gain.linearRampToValueAtTime(0.001, now + 0.4);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 0.4);
         });
@@ -165,7 +197,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.4, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 0.5);
         });
@@ -181,7 +213,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.5, now + 0.9);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 1.2);
         });
@@ -196,7 +228,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.5, now + delay);
           gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.1);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + delay);
           osc.stop(now + delay + 0.1);
         });
@@ -209,7 +241,7 @@ class AudioEngine {
         gain.gain.setValueAtTime(vol * 0.4, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(alarmOut);
         osc.start(now);
         osc.stop(now + 0.35);
       } else if (type === 'police') {
@@ -224,7 +256,7 @@ class AudioEngine {
         gain.gain.setValueAtTime(vol * 0.45, now + 0.48);
         gain.gain.linearRampToValueAtTime(0.001, now + 0.5);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(alarmOut);
         osc.start(now);
         osc.stop(now + 0.5);
       } else if (type === 'horn') {
@@ -237,7 +269,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.35, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 0.7);
         });
@@ -251,7 +283,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.35, now + i * 0.15);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.6);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.15);
           osc.stop(now + i * 0.15 + 0.6);
         });
@@ -265,7 +297,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.2, now + i * 0.12);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.12);
           osc.stop(now + i * 0.12 + 0.2);
         });
@@ -279,7 +311,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.25, now + i * 0.2);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.2 + 0.5);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.2);
           osc.stop(now + i * 0.2 + 0.5);
         });
@@ -294,7 +326,7 @@ class AudioEngine {
         gain.gain.setValueAtTime(vol * 0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(alarmOut);
         osc.start(now);
         osc.stop(now + 0.35);
       } else if (type === 'nature') {
@@ -307,7 +339,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.15, now + i * 0.1);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.15);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.1);
           osc.stop(now + i * 0.1 + 0.15);
         });
@@ -321,7 +353,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.2, now + i * 0.18);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.9);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.18);
           osc.stop(now + i * 0.18 + 0.9);
         });
@@ -335,7 +367,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.25, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 1.8);
         });
@@ -350,7 +382,7 @@ class AudioEngine {
         gain.gain.linearRampToValueAtTime(vol * 0.3, now + 0.5);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(alarmOut);
         osc.start(now);
         osc.stop(now + 1.2);
       } else if (type === 'retro') {
@@ -363,7 +395,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.15, now + i * 0.08);
           gain.gain.setValueAtTime(0, now + i * 0.08 + 0.06);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.08);
           osc.stop(now + i * 0.08 + 0.06);
         });
@@ -377,7 +409,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.2, now + i * 0.04);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 1.2);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.04);
           osc.stop(now + i * 0.04 + 1.2);
         });
@@ -391,7 +423,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.3, now + i * 0.15);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.35);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.15);
           osc.stop(now + i * 0.15 + 0.35);
         });
@@ -405,7 +437,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.2, now + i * 0.4);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.4 + 1.5);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.4);
           osc.stop(now + i * 0.4 + 1.5);
         });
@@ -419,7 +451,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.3, now + i * 0.12);
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.5);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now + i * 0.12);
           osc.stop(now + i * 0.12 + 0.5);
         });
@@ -433,7 +465,7 @@ class AudioEngine {
           gain.gain.setValueAtTime(vol * 0.25, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(alarmOut);
           osc.start(now);
           osc.stop(now + 1.5);
         });
@@ -446,6 +478,14 @@ class AudioEngine {
 
   public stopAlarmSound() {
     this.volumeLocked = false;
+    this.escalationLevel = 0;
+    this.currentTone = null;
+    this.stopEscalationSiren();
+    // Tear down the loudness bus so nothing is left connected.
+    if (this.alarmBus) {
+      try { this.alarmBus.disconnect(); } catch { /* ignore */ }
+      this.alarmBus = null;
+    }
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.setActionHandler('pause', null);
@@ -468,6 +508,161 @@ class AudioEngine {
 
   public isAlarmVolumeLocked(): boolean {
     return this.volumeLocked;
+  }
+
+  /**
+   * Creates (or returns) the master alarm bus: alarmBus -> limiter -> speakers.
+   * The limiter keeps the escalating loudness loud without clipping.
+   */
+  private ensureAlarmBus(): GainNode {
+    const ctx = this.getContext();
+    if (!this.alarmBus) {
+      const bus = ctx.createGain();
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.25;
+      bus.connect(limiter);
+      limiter.connect(ctx.destination);
+      this.alarmBus = bus;
+    }
+    this.alarmBus.gain.setValueAtTime(this.computeBusGain(), ctx.currentTime);
+    return this.alarmBus;
+  }
+
+  private computeBusGain(): number {
+    const level = Math.max(0, Math.min(3, this.escalationLevel));
+    const boost = AudioEngine.ESCALATION_BOOST[level] ?? 1;
+    return Math.max(0.05, Math.min(1, this.alarmBusBaseGain)) * boost;
+  }
+
+  /**
+   * Re-asserts the alarm: resumes a suspended/ducked/interrupted AudioContext,
+   * re-applies the locked gain and restarts anything that was stopped.
+   * Called every 200 ms by the volume-lock watchdog.
+   * @returns true when the audio context is running.
+   */
+  public forceLoud(): boolean {
+    let running = true;
+    try {
+      const ctx = this.ctx;
+      if (ctx) {
+        if (ctx.state !== 'running') {
+          ctx.resume().catch(() => { /* still blocked */ });
+        }
+        running = ctx.state === 'running';
+
+        if (this.alarmBus) {
+          const target = this.computeBusGain();
+          this.alarmBus.gain.cancelScheduledValues(ctx.currentTime);
+          this.alarmBus.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
+        }
+      }
+
+      // Re-arm the tone loop if something cleared it while ringing.
+      if (this.volumeLocked && !this.alarmInterval && ctx) {
+        // The interval callback is intentionally not stored, so re-create it
+        // from the currently configured alarm tone.
+        if (this.currentTone) {
+          this.startAlarmSound(
+            this.currentTone.type,
+            this.currentTone.volume,
+            this.currentTone.gentle,
+            this.currentTone.onFade
+          );
+        }
+      }
+    } catch { /* ignore */ }
+    return running;
+  }
+
+  /** Sets the loudness escalation level (0-3) and toggles the piercing siren. */
+  public setEscalationLevel(level: number): void {
+    const next = Math.max(0, Math.min(3, Math.floor(level)));
+    if (next === this.escalationLevel) {
+      const ctx = this.ctx;
+      if (ctx && this.alarmBus) {
+        this.alarmBus.gain.setTargetAtTime(this.computeBusGain(), ctx.currentTime, 0.1);
+      }
+      return;
+    }
+    this.escalationLevel = next;
+
+    const ctx = this.ctx;
+    if (ctx && this.alarmBus) {
+      this.alarmBus.gain.setTargetAtTime(this.computeBusGain(), ctx.currentTime, 0.15);
+    }
+
+    if (next >= 2) {
+      this.startEscalationSiren(next === 3 ? 0.42 : 0.26);
+    } else {
+      this.stopEscalationSiren();
+    }
+  }
+
+  public getEscalationLevel(): number {
+    return this.escalationLevel;
+  }
+
+  /**
+   * Extra piercing dual-oscillator siren layered on top of the alarm tone.
+   * High frequency content cuts through a phone speaker even when the system
+   * volume has been turned down.
+   */
+  private startEscalationSiren(gainValue: number): void {
+    if (this.sirenNodes.length > 0) {
+      const ctx = this.ctx;
+      if (ctx) {
+        this.sirenNodes.forEach((n) => n.gain.gain.setTargetAtTime(gainValue, ctx.currentTime, 0.1));
+      }
+      return;
+    }
+    const ctx = this.ctx;
+    if (!ctx || !this.alarmBus) return;
+
+    try {
+      const now = ctx.currentTime;
+
+      // Wailing LFO shared by both oscillators (classic air-raid sweep).
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 1.6;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 420;
+      lfo.connect(lfoGain);
+
+      [1750, 2210].forEach((baseFreq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(baseFreq, now);
+        lfoGain.connect(osc.frequency);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(gainValue, now + 0.4);
+        osc.connect(gain);
+        gain.connect(this.alarmBus!);
+        osc.start(now);
+        this.sirenNodes.push({ osc, gain });
+      });
+
+      lfo.start(now);
+      this.sirenLfo = lfo;
+    } catch { /* ignore */ }
+  }
+
+  public stopEscalationSiren(): void {
+    this.sirenNodes.forEach((n) => {
+      try { n.osc.stop(); } catch { /* ignore */ }
+      try { n.osc.disconnect(); } catch { /* ignore */ }
+    });
+    this.sirenNodes = [];
+    if (this.sirenLfo) {
+      try { this.sirenLfo.stop(); } catch { /* ignore */ }
+      try { this.sirenLfo.disconnect(); } catch { /* ignore */ }
+      this.sirenLfo = null;
+    }
   }
 
   public getLockedVolumePercent(): number {
