@@ -28,6 +28,7 @@ import {
   Send
 } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
+import { APP_NAME, APP_VERSION } from '../constants';
 import {
   getNotificationStatus,
   requestNotificationPermission,
@@ -394,7 +395,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <div className="w-12 h-12 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mx-auto text-2xl">
                       👑
                     </div>
-                    <h4 className="text-base font-bold text-white">WakeUp Alarm Pro</h4>
+                    <h4 className="text-base font-bold text-white">{APP_NAME} Pro</h4>
                     <p className="text-slate-400">Unlock cheat prevention, custom MP3 uploads, and unlimited habit missions.</p>
                   </div>
 
@@ -489,7 +490,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
 
                     <p className="text-slate-400 leading-relaxed">
-                      Allowing browser notifications lets WakeUp Alarm ring and pop up desktop alerts even when the tab is running in the background.
+                      Allowing browser notifications lets {APP_NAME} ring and pop up desktop alerts even when the tab is running in the background.
                     </p>
 
                     {notifStatus.permission !== 'granted' ? (
@@ -591,7 +592,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {activeModal === 'about' && (
                 <div className="space-y-3 text-xs text-slate-300 text-center">
                   <div className="text-3xl">⏰</div>
-                  <h4 className="font-bold text-sm text-white">WakeUp Alarm v2.5.0</h4>
+                  <h4 className="font-bold text-sm text-white">{APP_NAME} v{APP_VERSION}</h4>
                   <p className="text-slate-400">Built with React, Vite, and Web Audio API.</p>
                   <div className="pt-2">
                     <button
