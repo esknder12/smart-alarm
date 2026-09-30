@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Relative base so the bundled assets also resolve when the WebView loads
+    // them from file://android_asset/public inside the Android app (Capacitor).
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
