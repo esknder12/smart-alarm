@@ -151,8 +151,8 @@ export const RingtonePickerModal: React.FC<RingtonePickerModalProps> = ({
           <div className="bg-gradient-to-r from-slate-900 via-[#1c1d23] to-slate-900 p-5 border-b border-slate-800 relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center ring-1 ring-amber-500/30">
-                  <Smartphone className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-slate-800 text-white flex items-center justify-center ring-1 ring-slate-700">
+                  <Smartphone className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white tracking-wide">
@@ -317,10 +317,10 @@ export const RingtonePickerModal: React.FC<RingtonePickerModalProps> = ({
           <div className="p-4 bg-slate-950 border-t border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-300">
               <span className="flex items-center space-x-1.5 font-bold">
-                <Volume2 className="w-4 h-4 text-amber-400" />
+                <Volume2 className="w-4 h-4 text-white" />
                 <span>Ringtone Volume</span>
               </span>
-              <span className="font-mono text-amber-400 font-bold">{volume}%</span>
+              <span className="font-mono text-white font-bold">{volume}%</span>
             </div>
 
             <input

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Sun, MapPin, Sparkles, ChevronRight, CheckSquare, RefreshCw, Trophy, Heart } from 'lucide-react';
-import { PetState, MoodLog, TarotCard, RoutineStep } from '../types';
-import { MorningInspiration } from './MorningInspiration';
+import { MapPin, ChevronRight, CheckSquare, Heart } from 'lucide-react';
+import { PetState, TarotCard, RoutineStep } from '../types';
+import { Language } from '../utils/translations';
 
 interface MorningTabProps {
   routine: RoutineStep[];
   onToggleStep: (id: string) => void;
   onSelectTab: (tab: any) => void;
+  language?: Language;
 }
 
 const TAROT_CARDS: TarotCard[] = [
@@ -19,8 +20,9 @@ const TAROT_CARDS: TarotCard[] = [
 export const MorningTab: React.FC<MorningTabProps> = ({
   routine,
   onToggleStep,
-  onSelectTab,
+  language = 'en',
 }) => {
+  const isAm = language === 'am';
   const [location, setLocation] = useState('Seoul');
   const [activeModal, setActiveModal] = useState<'pet' | 'feeling' | 'tarot' | null>(null);
 
@@ -58,154 +60,130 @@ export const MorningTab: React.FC<MorningTabProps> = ({
 
   return (
     <div id="morning-tab-view" className="space-y-6 pb-24 max-w-md mx-auto">
-      {/* Top Location Selector matching Image 3 */}
-      <div className="flex items-center justify-between px-1">
-        <button
-          onClick={() => {
-            const nextLoc = location === 'Seoul' ? 'New York' : location === 'New York' ? 'London' : 'Seoul';
-            setLocation(nextLoc);
-          }}
-          className="text-xl font-black text-white flex items-center space-x-1 hover:text-amber-400 transition"
-        >
-          <span>{location}</span>
-          <ChevronRight className="w-5 h-5 text-slate-400 inline" />
-        </button>
-      </div>
-
-      {/* Morning Inspiration Component */}
-      <MorningInspiration />
-
-      {/* Weather Widget Card matching Image 3 */}
+      {/* 1. Primary Feature: Weather & City Card */}
       <div className="bg-gradient-to-b from-[#2a3b5c] to-[#1c2840] border border-blue-500/20 rounded-3xl p-5 shadow-xl text-white space-y-4 relative">
-        {/* Callout speech bubble */}
-        <div className="bg-white text-slate-950 font-bold text-xs px-3 py-1.5 rounded-2xl shadow-md inline-block relative">
-          📍 Is this your location?
-          <div className="absolute -bottom-1 left-4 w-2 h-2 bg-white rotate-45" />
+        {/* Location selector header pill */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              const nextLoc = location === 'Seoul' ? 'New York' : location === 'New York' ? 'London' : 'Seoul';
+              setLocation(nextLoc);
+            }}
+            className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-1.5 rounded-2xl backdrop-blur-md border border-white/10 transition flex items-center space-x-1"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-300" />
+            <span>{location}</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+          </button>
+          <span className="text-[11px] font-mono text-slate-300">
+            {isAm ? 'የዛሬው የአየር ሁኔታ' : "Today's Weather"}
+          </span>
         </div>
 
         <div className="flex justify-between items-end">
           <div>
-            <div className="text-lg font-extrabold flex items-center space-x-2">
-              <span>Partly cloudy 🌤️</span>
+            <div className="text-2xl font-black flex items-center space-x-2">
+              <span>{isAm ? 'በከፊል ደመናማ 🌤️' : 'Partly Cloudy 🌤️'}</span>
             </div>
-            <div className="text-xs text-slate-300 font-medium mt-1">
-              high 31° | low 23°
+            <div className="text-xs text-slate-300 font-semibold mt-1">
+              {isAm ? 'ከፍተኛ 31° | ዝቅተኛ 23°' : 'High 31° | Low 23°'}
             </div>
           </div>
         </div>
 
-        {/* Hourly Forecast Scroll Strip matching Image 3 */}
-        <div className="flex space-x-3 overflow-x-auto pt-2 pb-1 scrollbar-none text-center">
+        {/* Hourly Forecast Scroll Strip */}
+        <div className="flex space-x-3 overflow-x-auto pt-2 pb-1 scrollbar-none text-center border-t border-white/10">
           {[
-            { hour: '11', temp: '29°' },
-            { hour: '12', temp: '29°' },
-            { hour: '13', temp: '28°' },
-            { hour: '14', temp: '27°' },
-            { hour: '15', temp: '26°' },
-            { hour: '16', temp: '26°' },
-            { hour: '17', temp: '26°' },
-            { hour: '18', temp: '26°' },
-            { hour: '19', temp: '25°' },
+            { hour: '11:00', temp: '29°' },
+            { hour: '12:00', temp: '29°' },
+            { hour: '13:00', temp: '28°' },
+            { hour: '14:00', temp: '27°' },
+            { hour: '15:00', temp: '26°' },
+            { hour: '16:00', temp: '26°' },
+            { hour: '17:00', temp: '26°' },
+            { hour: '18:00', temp: '26°' },
+            { hour: '19:00', temp: '25°' },
           ].map((item, idx) => (
             <div key={idx} className="shrink-0 flex flex-col items-center space-y-1">
-              <span className="text-[11px] text-slate-300 font-mono">{item.hour}</span>
-              <span className="text-sm">🌤️</span>
+              <span className="text-[10px] text-slate-300 font-mono">{item.hour}</span>
+              <span className="text-base">🌤️</span>
               <span className="text-xs font-bold font-mono">{item.temp}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 4 App Grid Icons matching Image 3 */}
-      <div className="grid grid-cols-4 gap-3 text-center">
+      {/* 2. Interactive Morning Tools Section */}
+      <div className="grid grid-cols-3 gap-3 text-center">
         {/* My Pet */}
         <button
           onClick={() => setActiveModal('pet')}
-          className="flex flex-col items-center space-y-1.5 group"
+          className="flex flex-col items-center space-y-2 group"
         >
-          <div className="w-16 h-16 rounded-2xl bg-sky-200/90 hover:bg-sky-200 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
+          <div className="w-16 h-16 rounded-2xl bg-[#1c1d22] border border-slate-800 hover:border-amber-500/50 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
             🐣
           </div>
-          <span className="text-xs font-bold text-slate-200">My pet</span>
+          <span className="text-xs font-bold text-slate-300 group-hover:text-white transition">
+            {isAm ? 'የእኔ እንስሳ' : 'My pet'}
+          </span>
         </button>
 
         {/* Morning feeling */}
         <button
           onClick={() => setActiveModal('feeling')}
-          className="flex flex-col items-center space-y-1.5 group"
+          className="flex flex-col items-center space-y-2 group"
         >
-          <div className="w-16 h-16 rounded-2xl bg-amber-200/90 hover:bg-amber-200 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
+          <div className="w-16 h-16 rounded-2xl bg-[#1c1d22] border border-slate-800 hover:border-amber-500/50 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
             😀
           </div>
-          <span className="text-xs font-bold text-slate-200">Morning feeling</span>
+          <span className="text-xs font-bold text-slate-300 group-hover:text-white transition">
+            {isAm ? 'የጠዋት ስሜት' : 'Morning feeling'}
+          </span>
         </button>
 
         {/* Daily Tarot */}
         <button
           onClick={() => setActiveModal('tarot')}
-          className="flex flex-col items-center space-y-1.5 group"
+          className="flex flex-col items-center space-y-2 group"
         >
-          <div className="w-16 h-16 rounded-2xl bg-purple-300/90 hover:bg-purple-300 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
+          <div className="w-16 h-16 rounded-2xl bg-[#1c1d22] border border-slate-800 hover:border-amber-500/50 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
             🎴
           </div>
-          <span className="text-xs font-bold text-slate-200">Daily Tarot</span>
-        </button>
-
-        {/* Report */}
-        <button
-          onClick={() => onSelectTab('report')}
-          className="flex flex-col items-center space-y-1.5 group"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-sky-300/90 hover:bg-sky-300 flex items-center justify-center text-3xl shadow-lg transition transform group-active:scale-95">
-            📊
-          </div>
-          <span className="text-xs font-bold text-slate-200">Report</span>
+          <span className="text-xs font-bold text-slate-300 group-hover:text-white transition">
+            {isAm ? 'ዕለታዊ ታሮት' : 'Daily Tarot'}
+          </span>
         </button>
       </div>
 
-      {/* Gemini Promo Banner matching Image 3 */}
-      <div className="bg-[#181a20] border border-slate-800 rounded-3xl p-5 text-white space-y-3 relative overflow-hidden shadow-xl">
-        <div className="absolute -right-8 -top-8 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl" />
-        <div className="text-2xl font-black leading-tight tracking-tight">
-          Vibe code<br />your app idea.
-        </div>
-        <div className="flex items-center space-x-2 text-xs font-bold text-amber-400">
-          <Sparkles className="w-4 h-4 fill-current" />
-          <span>Google AI Studio • Vibe Code with Gemini</span>
-        </div>
-        <p className="text-xs text-slate-400">
-          Unlock your creative potential and build innovative apps with the Gemini coding model.
-        </p>
-      </div>
-
-      {/* Morning Habits & Checklist */}
+      {/* 3. Morning Habits & Checklist */}
       <div className="bg-[#1c1d22] border border-slate-800 rounded-3xl p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-white flex items-center space-x-2">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <h3 className="text-base font-black text-white flex items-center space-x-2">
             <CheckSquare className="w-4 h-4 text-amber-400" />
-            <span>Morning Habits</span>
+            <span>{isAm ? 'የጠዋት ልማዶች' : 'Morning Habits'}</span>
           </h3>
-          <span className="text-xs font-mono text-amber-400 font-bold">
-            {routine.filter((r) => r.completed).length} / {routine.length} done
+          <span className="text-xs font-mono text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+            {routine.filter((r) => r.completed).length} / {routine.length} {isAm ? 'ተጠናቋል' : 'done'}
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 pt-1">
           {routine.map((item) => (
             <button
               key={item.id}
               onClick={() => onToggleStep(item.id)}
-              className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition ${
+              className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition ${
                 item.completed
                   ? 'bg-slate-900/60 border-slate-800 text-slate-500 line-through'
                   : 'bg-[#151619] border-slate-800/90 text-slate-200 hover:border-slate-700'
               }`}
             >
-              <span className="text-xs font-semibold">{item.title}</span>
+              <span className="text-xs font-bold">{item.title}</span>
               <div
                 className={`w-5 h-5 rounded-md flex items-center justify-center border ${
                   item.completed
-                    ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold'
+                    ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-black'
                     : 'border-slate-700 bg-slate-900'
                 }`}
               >
@@ -222,7 +200,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
           <div className="max-w-md w-full bg-[#1c1d22] border border-slate-800 rounded-3xl p-6 text-center space-y-4 text-white">
             <h3 className="text-xl font-extrabold flex items-center justify-center space-x-2">
               <span>🐣</span>
-              <span>My Morning Pet: {pet.name}</span>
+              <span>{isAm ? `የጠዋት እንስሳዬ: ${pet.name}` : `My Morning Pet: ${pet.name}`}</span>
             </h3>
 
             <div className="w-28 h-28 mx-auto rounded-full bg-gradient-to-tr from-sky-400 to-amber-300 flex items-center justify-center text-6xl shadow-xl animate-bounce">
@@ -231,7 +209,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
 
             <div className="space-y-2 text-xs">
               <div className="flex justify-between text-slate-400">
-                <span>Level {pet.level}</span>
+                <span>{isAm ? `ደረጃ ${pet.level}` : `Level ${pet.level}`}</span>
                 <span>XP: {pet.xp} / 100</span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
@@ -239,7 +217,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
               </div>
 
               <div className="flex justify-between text-slate-400 pt-2">
-                <span>Happiness</span>
+                <span>{isAm ? 'ደስታ' : 'Happiness'}</span>
                 <span className="text-pink-400 font-bold">{pet.happiness}%</span>
               </div>
             </div>
@@ -250,13 +228,13 @@ export const MorningTab: React.FC<MorningTabProps> = ({
                 className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-2xl transition flex items-center justify-center space-x-1"
               >
                 <Heart className="w-4 h-4 fill-current text-slate-950" />
-                <span>Feed Pet (+10)</span>
+                <span>{isAm ? 'ምግብ ስጥ (+10)' : 'Feed Pet (+10)'}</span>
               </button>
               <button
                 onClick={() => setActiveModal(null)}
                 className="py-3 px-5 bg-slate-800 hover:bg-slate-700 font-bold rounded-2xl transition"
               >
-                Close
+                {isAm ? 'ዝጋ' : 'Close'}
               </button>
             </div>
           </div>
@@ -267,15 +245,17 @@ export const MorningTab: React.FC<MorningTabProps> = ({
       {activeModal === 'feeling' && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-[#1c1d22] border border-slate-800 rounded-3xl p-6 text-center space-y-4 text-white">
-            <h3 className="text-xl font-extrabold">How do you feel this morning?</h3>
+            <h3 className="text-xl font-extrabold">
+              {isAm ? 'ዛሬ ጠዋት ምን ይሰማዎታል?' : 'How do you feel this morning?'}
+            </h3>
 
             <div className="grid grid-cols-5 gap-2 pt-2">
               {[
-                { id: 'great', emoji: '🤩', label: 'Great' },
-                { id: 'happy', emoji: '😀', label: 'Happy' },
-                { id: 'neutral', emoji: '😐', label: 'Okay' },
-                { id: 'tired', emoji: '🥱', label: 'Tired' },
-                { id: 'groggy', emoji: '😴', label: 'Groggy' },
+                { id: 'great', emoji: '🤩', label: isAm ? 'በጣም ጥሩ' : 'Great' },
+                { id: 'happy', emoji: '😀', label: isAm ? 'ደስተኛ' : 'Happy' },
+                { id: 'neutral', emoji: '😐', label: isAm ? 'ደህና' : 'Okay' },
+                { id: 'tired', emoji: '🥱', label: isAm ? 'ደካክሞኛል' : 'Tired' },
+                { id: 'groggy', emoji: '😴', label: isAm ? 'እንቅልፍ' : 'Groggy' },
               ].map((f) => (
                 <button
                   key={f.id}
@@ -297,7 +277,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
 
             {feelingSaved && (
               <p className="text-xs text-emerald-400 font-bold animate-pulse">
-                ✓ Morning feeling logged for today!
+                {isAm ? '✓ የዛሬው የጠዋት ስሜትዎ ተመዝግቧል!' : '✓ Morning feeling logged for today!'}
               </p>
             )}
 
@@ -305,7 +285,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
               onClick={() => setActiveModal(null)}
               className="w-full py-3 bg-red-500 hover:bg-red-400 text-white font-bold rounded-2xl transition"
             >
-              Done
+              {isAm ? 'ተጠናቋል' : 'Done'}
             </button>
           </div>
         </div>
@@ -315,19 +295,23 @@ export const MorningTab: React.FC<MorningTabProps> = ({
       {activeModal === 'tarot' && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-[#1c1d22] border border-slate-800 rounded-3xl p-6 text-center space-y-4 text-white">
-            <h3 className="text-xl font-extrabold">🎴 Daily Tarot Motivation</h3>
+            <h3 className="text-xl font-extrabold">
+              {isAm ? '🎴 ዕለታዊ የታሮት ማነቃቂያ' : '🎴 Daily Tarot Motivation'}
+            </h3>
 
             {!isFlipped ? (
               <div className="space-y-4">
                 <div className="w-40 h-60 mx-auto rounded-2xl bg-gradient-to-br from-purple-900 to-indigo-950 border-2 border-purple-500/40 flex flex-col items-center justify-center shadow-2xl">
                   <span className="text-5xl">🔮</span>
-                  <span className="text-xs font-bold text-purple-300 mt-2">Draw Your Card</span>
+                  <span className="text-xs font-bold text-purple-300 mt-2">
+                    {isAm ? 'ካርድዎን ይሳቡ' : 'Draw Your Card'}
+                  </span>
                 </div>
                 <button
                   onClick={drawTarot}
                   className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-2xl transition shadow-lg shadow-purple-600/30"
                 >
-                  Reveal Today's Card
+                  {isAm ? 'የዛሬውን ካርድ ይግለጡ' : "Reveal Today's Card"}
                 </button>
               </div>
             ) : (
@@ -345,7 +329,7 @@ export const MorningTab: React.FC<MorningTabProps> = ({
                   onClick={() => setActiveModal(null)}
                   className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-2xl transition"
                 >
-                  Embrace Today's Energy
+                  {isAm ? 'የዛሬውን ብርታት ተቀበሉ' : "Embrace Today's Energy"}
                 </button>
               </div>
             )}

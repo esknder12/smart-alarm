@@ -7,10 +7,10 @@ interface NightstandClockProps {
 }
 
 const QUOTES = [
-  "Every morning is a clean slate to build your future.",
-  "Rise up, start fresh, see the bright opportunity in each day.",
-  "The secret of getting ahead is getting started.",
-  "Mornings are full of hope and inspiration."
+  "እያንዳንዱ ጠዋት የወደፊቱን ለመገንባት አዲስ እድል ነው።",
+  "ተነሱ፣ በአዲስ መንፈስ ጀምሩ፣ የእያንዳንዱን ቀን ብሩህ እድል ተመልከቱ።",
+  "ወደፊት የመራመድ ሚስጥር መጀመር ነው።",
+  "ማለዳዎች በተስፋ እና በማነቃቃት የተሞሉ ናቸው።"
 ];
 
 export const NightstandClock: React.FC<NightstandClockProps> = ({
@@ -48,14 +48,14 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20 text-xs font-semibold">
-            <CloudSun className="w-4 h-4 text-amber-400" />
+          <div className="flex items-center space-x-2 text-slate-200 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-xs font-semibold">
+            <CloudSun className="w-4 h-4 text-white" />
             <span>72°F Clear & Calm</span>
           </div>
           {nextAlarmTime && (
-            <div className="flex items-center space-x-2 text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20 text-xs font-semibold">
-              <AlarmClock className="w-4 h-4" />
-              <span>Alarm: {nextAlarmTime}</span>
+            <div className="flex items-center space-x-2 text-slate-200 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-xs font-semibold">
+              <AlarmClock className="w-4 h-4 text-white" />
+              <span>ማንቂያ: {nextAlarmTime}</span>
             </div>
           )}
         </div>
@@ -70,7 +70,7 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
             }`}
           >
             <Moon className="w-4 h-4" />
-            <span>{isDimmed ? 'Eye-Safe Dim ON' : 'Dim Display'}</span>
+            <span>{isDimmed ? 'የምሽት ማብራሪያ በርቷል' : 'ማብራሪያውን ቀንስ'}</span>
           </button>
 
           <button
@@ -96,7 +96,7 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
 
         {/* Motivational Ticker */}
         <div className="mt-8 max-w-lg mx-auto text-sm sm:text-base font-medium italic text-slate-400 flex items-center justify-center space-x-2">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          <Sparkles className="w-4 h-4 text-white shrink-0" />
           <span>"{QUOTES[quoteIndex]}"</span>
         </div>
       </div>

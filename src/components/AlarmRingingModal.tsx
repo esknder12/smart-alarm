@@ -3,19 +3,24 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Alarm, ChallengeType } from '../types';
 import { audioEngine } from '../utils/audio';
 import { WALLPAPERS } from './AlarmClock';
-import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2 } from 'lucide-react';
+import { Language } from '../utils/translations';
+import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock } from 'lucide-react';
 
 interface AlarmRingingModalProps {
   alarm: Alarm;
   onDismiss: () => void;
   onSnooze: (minutes: number) => void;
+  language?: Language;
 }
 
 export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
   alarm,
   onDismiss,
   onSnooze,
+  language = 'am',
 }) => {
+  const isAm = language === 'am';
+  const [volumeAttemptBlocked, setVolumeAttemptBlocked] = useState<boolean>(false);
   const [challengePassed, setChallengePassed] = useState<boolean>(alarm.challenge === 'none');
   const [mathProblem, setMathProblem] = useState<{ question: string; answer: number }>({ question: '', answer: 0 });
   const [userMathInput, setUserMathInput] = useState<string>('');
@@ -70,11 +75,11 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
       generateMathProblem();
     } else if (alarm.challenge === 'typing') {
       const affirmations = [
-        'I am awake and energized for today',
-        'Today brings new opportunities and growth',
-        'I embrace this morning with clarity',
-        'I am capable of achieving my goals today',
-        'Every day is a fresh new beginning'
+        'ነቅቻለሁ እና ለዛሬው ቀን ዝግጁ ነኝ',
+        'ዛሬ አዳዲስ እድሎችን እና እድገትን ያመጣል',
+        'ይህንን ጠዋት በጠራ አእምሮ እቀበላለሁ',
+        'ዛሬ ግቦቼን ለማሳካት ብቃት አለኝ',
+        'እያንዳንዱ ቀን አዲስ ጅምር ነው'
       ];
       setAffirmation(affirmations[Math.floor(Math.random() * affirmations.length)]);
     } else if (alarm.challenge === 'memory' || alarm.challenge === 'tiles') {
@@ -99,6 +104,41 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     }
   }, [challengePassed]);
 
+  // Intercept and disable Volume Down and Mute key presses during ringing until alarm is disabled
+  useEffect(() => {
+    const handleVolumeLock = (e: KeyboardEvent) => {
+      const isVolKey =
+        e.key === 'AudioVolumeDown' ||
+        e.key === 'VolumeDown' ||
+        e.key === 'AudioVolumeMute' ||
+        e.key === 'VolumeMute' ||
+        e.code === 'AudioVolumeDown' ||
+        e.code === 'VolumeDown' ||
+        e.code === 'AudioVolumeMute' ||
+        e.code === 'VolumeMute' ||
+        e.key === '-' ||
+        e.key === 'PageDown' ||
+        (e.key === 'ArrowDown' && (e.altKey || e.ctrlKey || e.metaKey));
+
+      if (isVolKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        setVolumeAttemptBlocked(true);
+        if ('vibrate' in navigator) {
+          try { navigator.vibrate([150, 80, 150]); } catch (err) {}
+        }
+        setTimeout(() => setVolumeAttemptBlocked(false), 3000);
+      }
+    };
+
+    window.addEventListener('keydown', handleVolumeLock, true);
+    window.addEventListener('keyup', handleVolumeLock, true);
+    return () => {
+      window.removeEventListener('keydown', handleVolumeLock, true);
+      window.removeEventListener('keyup', handleVolumeLock, true);
+    };
+  }, []);
+
   const handleShake = () => {
     if ('vibrate' in navigator) {
       try { navigator.vibrate(60); } catch (e) {}
@@ -107,7 +147,6 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
       const next = prev + 1;
       if (next >= targetShakes) {
         setChallengePassed(true);
-        audioEngine.stopAlarmSound();
       }
       return next;
     });
@@ -134,7 +173,6 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     e.preventDefault();
     if (parseInt(userMathInput, 10) === mathProblem.answer) {
       setChallengePassed(true);
-      audioEngine.stopAlarmSound();
     } else {
       if ('vibrate' in navigator) {
         try { navigator.vibrate([100, 50, 100]); } catch (e) {}
@@ -148,7 +186,6 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     setUserTypingInput(e.target.value);
     if (e.target.value.trim().toLowerCase() === affirmation.toLowerCase()) {
       setChallengePassed(true);
-      audioEngine.stopAlarmSound();
     }
   };
 
@@ -189,7 +226,6 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 
     if (newSeq.length === memorySequence.length) {
       setChallengePassed(true);
-      audioEngine.stopAlarmSound();
     }
   };
 
@@ -197,6 +233,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     if ('vibrate' in navigator) {
       try { navigator.vibrate(100); } catch (e) {}
     }
+    audioEngine.stopAlarmSound();
     onSnooze(mins);
   };
 
@@ -204,6 +241,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     if ('vibrate' in navigator) {
       try { navigator.vibrate([150, 50, 200]); } catch (e) {}
     }
+    audioEngine.stopAlarmSound();
     onDismiss();
   };
 
@@ -230,24 +268,69 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 
         <div className="relative z-10">
           {/* Haptic Vibration Active Badge */}
-          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold mb-3 animate-pulse">
-            <Activity className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold mb-3 animate-pulse">
+            <Activity className="w-3.5 h-3.5 text-white" />
             <span>Haptic Vibration & Audio Signal Active 📳</span>
           </div>
 
-          {/* Bell Icon with Visual Haptic Ripple Rings */}
-          <div className="relative mx-auto w-20 h-20 mb-4">
-            <span className="absolute inset-0 rounded-full bg-amber-500/30 animate-ping pointer-events-none" />
-            <div className="w-20 h-20 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center ring-8 ring-amber-500/10 animate-bounce relative z-10">
-              <BellRing className="w-10 h-10" />
+          {/* High Security Volume Lock Badge */}
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left flex items-center justify-between shadow-md">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <VolumeX className="w-4.5 h-4.5 animate-pulse" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                  <span>{isAm ? 'የድምፅ መቀነሻ ተቆልፏል' : 'Volume Down Disabled'}</span>
+                  <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">
+                    {isAm ? 'ተቆልፏል' : 'LOCKED'}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-300 mt-0.5">
+                  {isAm
+                    ? 'ድምፅ መቀነስ አይቻልም። ፈተናውን ፈፅመው ማንቂያውን ሲያጠፉ ይከፈታል።'
+                    : 'Volume down is locked until challenge is finished & alarm is disabled'}
+                </div>
+              </div>
             </div>
           </div>
 
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">{alarm.label || 'Wake Up Time!'}</h2>
+          {/* Toast Alert on Volume Down Attempt */}
+          <AnimatePresence>
+            {volumeAttemptBlocked && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                className="mb-4 p-3 bg-rose-500 text-white rounded-2xl font-bold text-xs shadow-xl flex items-center justify-center space-x-2 animate-bounce border border-rose-300"
+              >
+                <ShieldAlert className="w-4 h-4 shrink-0 text-white" />
+                <span>
+                  {challengePassed
+                    ? (isAm
+                        ? 'የድምፅ መቀነሻ ተቆልፏል! ድምፅ ለመክፈት "ማንቂያውን አጥፋ" የሚለውን ይጫኑ።'
+                        : 'Volume Down Locked! Click "Disable Alarm" below to turn off alarm and release volume lock.')
+                    : (isAm
+                        ? 'የድምፅ መቀነሻ ተቆልፏል! ማንቂያውን ለማጥፋት ፈተናውን ይጨርሱ።'
+                        : 'Volume Down Locked! Finish challenge & disable alarm to unlock volume.')}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bell Icon with Visual Haptic Ripple Rings */}
+          <div className="relative mx-auto w-20 h-20 mb-4">
+            <span className="absolute inset-0 rounded-full bg-slate-700/30 animate-ping pointer-events-none" />
+            <div className="w-20 h-20 rounded-full bg-slate-800 text-white flex items-center justify-center ring-8 ring-slate-700/30 animate-bounce relative z-10">
+              <BellRing className="w-10 h-10 text-white" />
+            </div>
+          </div>
+
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">{alarm.label || 'የመነቂያ ሰዓት!'}</h2>
           {activeWallpaper.quote && (
             <p className="text-amber-300/90 text-xs italic mt-1 px-4">"{activeWallpaper.quote}"</p>
           )}
-          <p className="text-slate-400 text-xs mt-1">Scheduled for {alarm.time}</p>
+          <p className="text-slate-400 text-xs mt-1">የተያዘለት ሰዓት: {alarm.time}</p>
 
           {/* Current Time Big Display */}
           <div className="my-5 py-4 bg-slate-950/70 rounded-2xl border border-slate-800/80 shadow-inner">
@@ -262,7 +345,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <span className="text-amber-400 font-bold flex items-center space-x-1.5">
                   <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                  <span>30s Auto-Fade Volume Ramp</span>
+                  <span>30 ሰከንድ የድምፅ በደረጃ መጨመሪያ</span>
                 </span>
                 <span className="font-mono text-slate-300 font-bold text-[11px]">
                   {currentVolumePercent}% ({fadeProgressSec}s / 30s)
@@ -276,8 +359,8 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
               </div>
               <p className="text-[10px] text-slate-400">
                 {fadeProgressSec < 30
-                  ? 'Gradually increasing volume to prevent sudden wake-up shock...'
-                  : 'Target volume level reached!'}
+                  ? 'ከባድ ድንጋጤን ለመከላከል ድምፁ በደረጃ እየጨመረ ነው...'
+                  : 'የተፈለገው የድምፅ መጠን ላይ ደርሷል!'}
               </p>
             </div>
           )}
@@ -380,10 +463,16 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
             </div>
           ) : (
             <div className="my-5 bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl flex items-center space-x-3 text-emerald-400 text-sm">
-              <CheckCircle2 className="w-6 h-6 shrink-0" />
+              <CheckCircle2 className="w-6 h-6 shrink-0 text-emerald-400" />
               <div className="text-left">
-                <div className="font-bold">Challenge Completed!</div>
-                <div className="text-xs text-emerald-300/80">You are officially wide awake!</div>
+                <div className="font-bold">
+                  {isAm ? 'ፈተናው በስኬት ተጠናቋል!' : 'Challenge Completed!'}
+                </div>
+                <div className="text-xs text-emerald-300/80">
+                  {isAm
+                    ? 'ማንቂያውን ለማጥፋት እና ድምፅ ቁልፉን ለመክፈት ከታች ያለውን አዝራር ይጫኑ።'
+                    : 'Click "Disable Alarm" below to turn off alarm sound and release volume lock.'}
+                </div>
               </div>
             </div>
           )}
@@ -397,10 +486,16 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2"
               >
                 <Sparkles className="w-5 h-5" />
-                <span>Dismiss & Start Morning</span>
+                <span>
+                  {isAm ? 'ማንቂያውን አጥፋ እና ቀኑን ጀምር' : 'Disable Alarm & Start Day'}
+                </span>
               </button>
             ) : (
-              <div className="text-xs text-slate-400 italic">Complete challenge above to enable dismiss</div>
+              <div className="text-xs text-slate-400 italic text-center">
+                {isAm
+                  ? 'ማንቂያውን ለማጥፋት እና ድምፅ መቀነሻውን ለመክፈት ከላይ ያለውን ፈተና ይጨርሱ'
+                  : 'Complete the challenge above to disable alarm & unlock volume controls'}
+              </div>
             )}
 
             <button
@@ -409,7 +504,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
               className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3.5 rounded-2xl transition flex items-center justify-center space-x-2 border border-slate-700/80"
             >
               <Clock className="w-4 h-4 text-amber-400" />
-              <span>Snooze (9 Minutes)</span>
+              <span>{isAm ? 'አጥፋና ከ9 ደቂቃ በኋላ ድገም' : 'Snooze 9 Minutes'}</span>
             </button>
           </div>
         </div>

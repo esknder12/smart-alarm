@@ -39,7 +39,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'alarm', label: t.alarm, icon: <AlarmClock className="w-5 h-5" /> },
     { id: 'sleep', label: t.sleep, icon: <Moon className="w-5 h-5" /> },
     { id: 'morning', label: t.morning, icon: <Sun className="w-5 h-5" /> },
-    { id: 'report', label: t.report, icon: <FileText className="w-5 h-5" /> },
     { id: 'settings', label: t.setting, icon: <Settings className="w-5 h-5" />, badge: true },
   ];
 
@@ -50,8 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="max-w-md mx-auto flex items-center justify-between">
           {/* Top Left: App Brand Badge */}
           <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-black text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-red-400" />
+            <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 text-white border border-slate-700 font-black text-xs">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
               <span>WakeUp Alarm</span>
             </div>
           </div>
@@ -60,19 +59,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-2 text-xs font-mono">
             <button
               onClick={() => setLanguage(language === 'en' ? 'am' : 'en')}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition border border-slate-700/60 flex items-center space-x-1"
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700/60 flex items-center space-x-1"
               title="Switch Language / ቋንቋ ይቀይሩ"
             >
-              <Globe className="w-3.5 h-3.5 text-amber-400" />
-              <span>{language === 'en' ? 'አማርኛ' : 'EN'}</span>
+              <Globe className="w-3.5 h-3.5 text-slate-200" />
+              <span>{language === 'en' ? 'አማርኛ' : 'English'}</span>
             </button>
             <span className="text-slate-400 font-sans text-xs hidden sm:inline">{currentTime}</span>
             <button
               onClick={toggleNightstand}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-red-400 transition"
               title="Nightstand Clock Mode"
             >
-              <Moon className="w-4 h-4 text-indigo-400" />
+              <Moon className="w-4 h-4 text-slate-300" />
             </button>
           </div>
         </div>

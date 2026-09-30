@@ -160,10 +160,10 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCustomInput(true)}
-                    className="w-full bg-[#1f2026] hover:bg-[#282a33] border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 transition text-cyan-400 font-bold text-sm"
+                    className="w-full bg-[#1f2026] hover:bg-[#282a33] border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 transition text-white font-bold text-sm"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                      <Plus className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-white" />
                     </div>
                     <span>Enter my own</span>
                   </button>
@@ -218,9 +218,9 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                   />
                   <button
                     type="button"
-                    className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 bg-cyan-500/10 px-3 py-1.5 rounded-xl border border-cyan-500/20"
+                    className="text-xs font-bold text-white hover:text-slate-200 flex items-center space-x-1 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 text-white" />
                     <span>Add time</span>
                   </button>
                 </div>

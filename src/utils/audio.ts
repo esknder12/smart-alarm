@@ -6,6 +6,8 @@ class AudioEngine {
   private alarmInterval: number | null = null;
   private alarmFadeInterval: number | null = null;
   private ambientSources: Map<string, { source: AudioNode; gain: GainNode; stopFn: () => void }> = new Map();
+  private volumeLocked: boolean = false;
+  private lockedVolumePercent: number = 100;
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -26,6 +28,31 @@ class AudioEngine {
     onFadeProgress?: (elapsedSec: number, currentPercent: number) => void
   ) {
     this.stopAlarmSound();
+    this.volumeLocked = true;
+    this.lockedVolumePercent = volume;
+
+    // Register MediaSession lock to prevent volume or pause suppression from media keys
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: '🚨 Alarm Ringing (Volume Locked)',
+          artist: 'Alarm Security System',
+          album: 'Solve Challenge To Dismiss',
+        });
+        const blockMediaKey = () => {
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        };
+        navigator.mediaSession.setActionHandler('pause', blockMediaKey);
+        navigator.mediaSession.setActionHandler('stop', blockMediaKey);
+        navigator.mediaSession.setActionHandler('seekbackward', blockMediaKey);
+        navigator.mediaSession.setActionHandler('seekforward', blockMediaKey);
+        navigator.mediaSession.setActionHandler('previoustrack', blockMediaKey);
+        navigator.mediaSession.setActionHandler('nexttrack', blockMediaKey);
+      } catch (e) {}
+    }
+
     const ctx = this.getContext();
     let targetVol = Math.max(0, Math.min(1, volume / 100));
     let currentVol = gentleWakeUp ? 0.05 : targetVol;
@@ -418,6 +445,17 @@ class AudioEngine {
   }
 
   public stopAlarmSound() {
+    this.volumeLocked = false;
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('stop', null);
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      } catch (e) {}
+    }
     if (this.alarmInterval) {
       clearInterval(this.alarmInterval);
       this.alarmInterval = null;
@@ -426,6 +464,14 @@ class AudioEngine {
       clearInterval(this.alarmFadeInterval);
       this.alarmFadeInterval = null;
     }
+  }
+
+  public isAlarmVolumeLocked(): boolean {
+    return this.volumeLocked;
+  }
+
+  public getLockedVolumePercent(): number {
+    return this.lockedVolumePercent;
   }
 
   // Play ambient sounds

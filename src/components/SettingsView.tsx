@@ -49,6 +49,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRelaunchTour,
 }) => {
   const t = translations[language];
+  const isAm = language === 'am';
 
   // Notification status state
   const [notifStatus, setNotifStatus] = useState<NotificationStatus>({ isSupported: true, permission: 'default' });
@@ -63,18 +64,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const granted = await requestNotificationPermission();
     setNotifStatus(getNotificationStatus());
     if (granted) {
-      setTestSentMsg('Permission granted! System notifications active.');
+      setTestSentMsg(isAm ? 'ፈቃድ ተሰጥቷል! የስርዓት ማስታወቂያዎች በርተዋል።' : 'Permission granted! System notifications active.');
     } else {
-      setTestSentMsg('Notification permission denied by browser.');
+      setTestSentMsg(isAm ? 'የማስታወቂያ ፈቃድ በአሳሹ ተከልክሏል።' : 'Notification permission denied by browser.');
     }
   };
 
   const handleSendTestNotif = () => {
     const success = sendTestNotification();
     if (success) {
-      setTestSentMsg('Test notification sent! Check your system banner.');
+      setTestSentMsg(isAm ? 'የሙከራ ማስታወቂያ ተላከ!' : 'Test notification sent! Check your system banner.');
     } else {
-      setTestSentMsg('Could not send notification. Please check browser permissions.');
+      setTestSentMsg(isAm ? 'ማስታወቂያ መላክ አልተቻለም።' : 'Could not send notification. Please check browser permissions.');
     }
   };
   const [preventPowerOff, setPreventPowerOff] = useState(false);
@@ -91,7 +92,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="max-w-md mx-auto space-y-6 pb-24 text-white font-sans">
       {/* Title */}
       <h1 className="text-3xl font-black tracking-tight px-1 text-white">
-        Settings
+        {isAm ? 'ማስተካከያዎች' : 'Settings'}
       </h1>
 
       {/* Account & Pro Top Card */}
@@ -106,7 +107,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <User className="w-5 h-5" />
             </div>
             <span className="font-bold text-sm text-slate-100 group-hover:text-white">
-              {isSignedIn ? 'My Account (Premium User)' : 'Sign in to your account'}
+              {isSignedIn
+                ? isAm ? 'የእኔ መለያ (ፕሪሚየም ተጠቃሚ)' : 'My Account (Premium User)'
+                : isAm ? 'ወደ መለያዎ ይግቡ' : 'Sign In to Your Account'}
             </span>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-slate-300" />
@@ -121,10 +124,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-black">
               ✓
             </div>
-            <span className="font-bold text-sm text-slate-100">Pro</span>
+            <span className="font-bold text-sm text-slate-100">{isAm ? 'ፕሮ (Pro)' : 'Pro Version'}</span>
           </div>
           <div className="flex items-center space-x-1 text-sm font-bold text-slate-300 group-hover:text-amber-400">
-            <span>Upgrade</span>
+            <span>{isAm ? 'አሻሽል' : 'Upgrade'}</span>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
         </button>
@@ -138,10 +141,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="w-5 h-5 text-emerald-400 flex items-center justify-center">
               <Star className="w-5 h-5 fill-emerald-500/20" />
             </div>
-            <span className="font-bold text-sm text-slate-100">Prevent power-off</span>
+            <span className="font-bold text-sm text-slate-100">
+              {isAm ? 'ስልክ እንዳይጠፋ ከልክል' : 'Prevent Power-off'}
+            </span>
           </div>
           <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
-            <span className="text-xs font-mono">• {preventPowerOff ? 'on' : 'off'}</span>
+            <span className="text-xs font-mono">
+              • {preventPowerOff ? (isAm ? 'በራ' : 'ON') : (isAm ? 'ጠፋ' : 'OFF')}
+            </span>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
         </button>
@@ -149,10 +156,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Row 4: Prevent app uninstall */}
         <div className="p-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3.5">
-            <div className="w-5 h-5 text-sky-400 flex items-center justify-center">
+            <div className="w-5 h-5 text-red-400 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <span className="font-bold text-sm text-slate-100">Prevent app uninstall</span>
+            <span className="font-bold text-sm text-slate-100">
+              {isAm ? 'መተግበሪያው እንዳይጠፋ ከልክል' : 'Prevent App Uninstall'}
+            </span>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
@@ -161,7 +170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onChange={(e) => setPreventUninstall(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500" />
+            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500" />
           </label>
         </div>
       </div>
@@ -174,7 +183,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="w-full p-4 bg-[#18191d] hover:bg-[#202127] border border-slate-800/80 rounded-2xl flex items-center justify-between transition text-left group"
         >
           <span className="font-bold text-sm text-slate-100 group-hover:text-white">
-            Alarm optimization
+            {isAm ? 'የማንቂያ ማሻሻያ' : 'Alarm Optimization'}
           </span>
           <ChevronRight className="w-5 h-5 text-slate-500" />
         </button>
@@ -186,10 +195,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              Advanced alarm settings
+              {isAm ? 'ከፍተኛ የማንቂያ ማስተካከያዎች' : 'Advanced Alarm Settings'}
             </div>
             <div className="text-xs text-slate-400 mt-0.5">
-              Alarm, mission settings · Alarm Cheat Prevention
+              {isAm ? 'የማንቂያ እና የተግባር ማስተካከያዎች' : 'Missions & Snooze parameters'}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
@@ -202,7 +211,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              Theme
+              {isAm ? 'ጭብጥ (Theme)' : 'App Theme'}
             </div>
             <div className="text-xs text-amber-400 mt-0.5 font-medium">
               {selectedTheme}
@@ -222,7 +231,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onClick={() => setActiveModal('sound_output')}
           className="w-full p-4 bg-[#18191d] hover:bg-[#202127] border border-slate-800/80 rounded-2xl flex items-center justify-between transition text-left"
         >
-          <span className="font-bold text-sm text-slate-100">Sound output</span>
+          <span className="font-bold text-sm text-slate-100">{isAm ? 'የድምፅ ማውጫ' : 'Sound Output'}</span>
           <span className="text-xs text-slate-400 font-medium">{soundOutput}</span>
         </button>
 
@@ -233,10 +242,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              Notification setting
+              {isAm ? 'የማስታወቂያ ማስተካከያ' : 'Notification Settings'}
             </div>
             <div className="text-xs text-slate-400 mt-0.5">
-              Service notification · Promotion & update
+              {isAm ? 'የአገልግሎት ማስታወቂያ እና ዝመናዎች' : 'Service & Background notifications'}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
@@ -249,10 +258,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              System configuration
+              {isAm ? 'የስርዓት ውቅር' : 'System Configuration'}
             </div>
             <div className="text-xs text-slate-400 mt-0.5">
-              App language ({language === 'en' ? 'English' : 'አማርኛ'}) · Else
+              {isAm ? 'የመተግበሪያ ቋንቋ (አማርኛ)' : 'App Language (English)'}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
@@ -270,7 +279,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200"
         >
           <div className="flex items-center space-x-2 font-bold text-sm">
-            <span>Notices</span>
+            <span>{isAm ? 'ማስታወቂያዎች' : 'Notices & Announcements'}</span>
             <span className="w-2 h-2 rounded-full bg-red-500" />
           </div>
         </button>
@@ -280,7 +289,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onClick={() => setActiveModal('faq')}
           className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
         >
-          <span>FAQ</span>
+          <span>{isAm ? 'ተደጋግመው የሚጠየቁ ጥያቄዎች (FAQ)' : 'Frequently Asked Questions (FAQ)'}</span>
         </button>
 
         {/* Send feedback */}
@@ -288,7 +297,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onClick={() => setActiveModal('feedback')}
           className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
         >
-          <span>Send feedback</span>
+          <span>{isAm ? 'አስተያየት ይላኩ' : 'Send Feedback'}</span>
         </button>
 
         {/* Copyright infringement report */}
@@ -296,7 +305,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onClick={() => setActiveModal('copyright')}
           className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
         >
-          <span>Copyright infringement report</span>
+          <span>{isAm ? 'የቅጂ መብት ጥሰት ሪፖርት' : 'Copyright Infringement Report'}</span>
         </button>
 
         {/* About */}
@@ -304,7 +313,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onClick={() => setActiveModal('about')}
           className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
         >
-          <span>About</span>
+          <span>{isAm ? 'ስለ መተግበሪያው' : 'About Application'}</span>
         </button>
       </div>
 
@@ -312,22 +321,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="pt-4 space-y-2">
         <button
           onClick={onLaunchNightstand}
-          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-indigo-400 hover:border-indigo-500/40 transition"
+          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-red-400 hover:border-red-500/40 transition"
         >
           <div className="flex items-center space-x-2">
             <Moon className="w-4 h-4" />
-            <span>Launch Nightstand Clock Mode</span>
+            <span>{isAm ? 'የአልጋ አጠገብ ሰዓት ሁነታን ክፈት' : 'Launch Nightstand Clock Mode'}</span>
           </div>
           <span>🌙</span>
         </button>
 
         <button
           onClick={onRelaunchTour}
-          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-cyan-400 hover:border-cyan-500/40 transition"
+          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-red-400 hover:border-red-500/40 transition"
         >
           <div className="flex items-center space-x-2">
             <Zap className="w-4 h-4" />
-            <span>Relaunch Setup Wizard Tour</span>
+            <span>{isAm ? 'የመተግበሪያ መመሪያውን እንደገና ክፈት' : 'Relaunch Setup Wizard Tour'}</span>
           </div>
           <span>🚀</span>
         </button>

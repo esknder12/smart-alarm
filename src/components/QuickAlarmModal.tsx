@@ -82,10 +82,10 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-800 pb-4">
             <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                <Zap className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-slate-800 text-white flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-lg font-bold">Quick alarm</h3>
+              <h3 className="text-lg font-bold">ፈጣን ማንቂያ</h3>
             </div>
             <button
               onClick={onClose}
@@ -99,7 +99,7 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
           <div className="text-center py-2 space-y-1">
             <div className="flex items-center justify-center space-x-3">
               <span className="text-5xl font-black font-mono tracking-tight text-white">
-                + {minutes}m
+                + {minutes}ደቂቃ
               </span>
               <button
                 onClick={handleReset}
@@ -110,13 +110,20 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
               </button>
             </div>
             <p className="text-xs font-medium text-slate-400">
-              Ring at <span className="text-amber-400 font-bold">{ringTimeStr}</span>
+              በዚህ ሰዓት ይጮኻል: <span className="text-amber-400 font-bold">{ringTimeStr}</span>
             </p>
           </div>
 
           {/* Quick Preset Grid matching Image 5 */}
           <div className="grid grid-cols-3 gap-2.5">
-            {presets.map((p) => (
+            {[
+              { label: '1 ደቂቃ', val: 1 },
+              { label: '5 ደቂቃ', val: 5 },
+              { label: '10 ደቂቃ', val: 10 },
+              { label: '15 ደቂቃ', val: 15 },
+              { label: '30 ደቂቃ', val: 30 },
+              { label: '1 ሰዓት', val: 60 },
+            ].map((p) => (
               <button
                 key={p.val}
                 type="button"
@@ -131,7 +138,7 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
           {/* Sound & Volume Row matching Image 5 */}
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between text-xs border-t border-slate-800/80 pt-4">
-              <span className="text-slate-400 font-medium">Alarm sound</span>
+              <span className="text-slate-400 font-medium">የማንቂያ ድምፅ</span>
               <div className="flex items-center space-x-2">
                 <select
                   value={sound}
@@ -179,7 +186,7 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
             className="w-full bg-[#ff3b5c] hover:bg-[#e02f4d] text-white font-black text-base py-3.5 rounded-2xl shadow-lg shadow-red-500/20 transition flex items-center justify-center space-x-2"
           >
             <Check className="w-5 h-5 stroke-[3]" />
-            <span>Save Quick Alarm</span>
+            <span>ፈጣን ማንቂያውን አስቀምጥ</span>
           </button>
         </motion.div>
       </div>

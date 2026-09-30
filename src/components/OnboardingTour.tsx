@@ -135,30 +135,23 @@ export const AUDIO_TRACKS = [
 ];
 
 export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onClose }) => {
-  // Steps:
-  // 0: Tour 1 - Most Motivating Companion
-  // 1: Tour 2 - End Demotivation
-  // 2: Tour 3 - Medical Mindfulness
-  // 3: Step 1/6 - Set start time
-  // 4: Step 2/6 - Notification delivery
-  // 5: Step 3/6 - Inspiration theme
-  // 6: Step 4/6 - Mission category
-  // 7: Step 5/6 - Wake-up audio
-  // 8: Step 6/6 - Finalize alert
+  // Steps: 0 to 3 (4 setup steps)
+  // 0: Step 1/4 - Set start time
+  // 1: Step 2/4 - Mission category
+  // 2: Step 3/4 - Wake-up audio
+  // 3: Step 4/4 - Finalize alert
   const [step, setStep] = useState<number>(0);
 
   // Timepicker state
   const [hour, setHour] = useState<string>('07');
   const [minute, setMinute] = useState<string>('00');
-  const [period, setPeriod] = useState<'AM' | 'p.m.'>('AM');
+  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
 
   // Permission Modal state
   const [notificationAllowed, setNotificationAllowed] = useState<boolean>(true);
 
   // Theme state
-  const [selectedTheme, setSelectedTheme] = useState<WallpaperId>('nature');
-  const [themeCategoryFilter, setThemeCategoryFilter] = useState<'ALL' | 'Trending' | 'Goal Focus'>('ALL');
-  const [previewingThemeId, setPreviewingThemeId] = useState<WallpaperId | null>(null);
+  const [selectedTheme] = useState<WallpaperId>('nature');
 
   // Mission state
   const [selectedMission, setSelectedMission] = useState<ChallengeType>('math');
@@ -172,17 +165,6 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
   const [volume, setVolume] = useState<number>(95);
   const [gentleMotivation, setGentleMotivation] = useState<boolean>(true);
 
-  const handleToggleThemeAudio = (e: React.MouseEvent, theme: ThemeOption) => {
-    e.stopPropagation();
-    if (previewingThemeId === theme.id) {
-      audioEngine.stopAlarmSound();
-      setPreviewingThemeId(null);
-    } else {
-      audioEngine.startAlarmSound(theme.soundId, 85, false);
-      setPreviewingThemeId(theme.id);
-    }
-  };
-
   const handleToggleAudio = (snd: SoundType) => {
     if (isPlayingAudio && selectedAudio === snd) {
       audioEngine.stopAlarmSound();
@@ -195,18 +177,17 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
   };
 
   const handleNext = () => {
-    if (isPlayingAudio || previewingThemeId) {
+    if (isPlayingAudio) {
       audioEngine.stopAlarmSound();
       setIsPlayingAudio(false);
-      setPreviewingThemeId(null);
     }
 
-    if (step < 8) {
+    if (step < 3) {
       setStep(step + 1);
     } else {
-      // Step 8: Set and Go
+      // Step 3: Set and Go
       let hInt = parseInt(hour, 10);
-      if (period === 'p.m.' && hInt < 12) hInt += 12;
+      if (period === 'PM' && hInt < 12) hInt += 12;
       if (period === 'AM' && hInt === 12) hInt = 0;
       const formattedTime = `${hInt.toString().padStart(2, '0')}:${minute}`;
 
@@ -249,37 +230,24 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
             onClick={handleBack}
             className="flex items-center space-x-1 text-xs font-bold text-slate-400 hover:text-white transition px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+            <RotateCcw className="w-3.5 h-3.5 text-red-400" />
             <span>Undo</span>
           </button>
         ) : (
           <div className="w-12" />
         )}
 
-        {step >= 3 ? (
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-              <div
-                className="bg-red-500 h-full transition-all duration-300"
-                style={{ width: `${((step - 2) / 6) * 100}%` }}
-              />
-            </div>
-            <div className="text-xs font-mono font-extrabold text-slate-400">
-              {step - 2}/6
-            </div>
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-28 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-red-500 h-full transition-all duration-300"
+              style={{ width: `${((step + 1) / 4) * 100}%` }}
+            />
           </div>
-        ) : (
-          <div className="flex space-x-2 mx-auto">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  step === i ? 'bg-red-500 w-5' : 'bg-slate-700'
-                }`}
-              />
-            ))}
+          <div className="text-xs font-mono font-extrabold text-slate-400">
+            {step + 1}/4
           </div>
-        )}
+        </div>
 
         <button
           onClick={onClose}
@@ -291,421 +259,94 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
 
       {/* Main Content Body */}
       <div className="relative z-10 max-w-md w-full mx-auto my-auto py-4">
-        {/* ================= TOUR 1 ================= */}
+        {/* ================= CREATE 1/4: Set Start Time ================= */}
         {step === 0 && (
-          <div className="text-center space-y-8 animate-fadeIn">
-            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <Trophy className="w-12 h-12 stroke-[1.75]" />
-            </div>
-
-            <h1 className="text-3xl font-black tracking-tight leading-snug px-4">
-              The most motivating companion worldwide
-            </h1>
-
-            <div className="space-y-4 pt-2">
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-lg">
-                <div className="text-sm text-slate-400 font-semibold">🌿 #1 Inspiration & Achievement App 🌿</div>
-                <div className="text-xs text-slate-500 mt-1">in 110 countries</div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-center">
-                  <div className="text-2xl font-black text-white flex items-center justify-center space-x-1">
-                    <span>4.9</span>
-                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1">Rating</div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-center">
-                  <div className="text-2xl font-black text-white">250M+</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Inspired Users</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= TOUR 2 ================= */}
-        {step === 1 && (
-          <div className="text-center space-y-6 animate-fadeIn">
-            <h1 className="text-3xl font-black tracking-tight leading-snug">
-              End the cycle of demotivation.<br />Own your success.
-            </h1>
-
-            <div className="grid grid-cols-2 gap-3 pt-3">
-              {/* Left Column: Other Tools */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left space-y-3">
-                <div className="text-xs font-bold text-slate-400 border-b border-slate-800 pb-2">Other Tools</div>
-                <div className="space-y-3 text-xs">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Read a quote</span>
-                    <span className="w-7 h-4 bg-emerald-500/80 rounded-full inline-block" />
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Watch a video</span>
-                    <span className="w-7 h-4 bg-emerald-500/80 rounded-full inline-block" />
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Watch a note</span>
-                    <span className="w-7 h-4 bg-emerald-500/80 rounded-full inline-block" />
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Write a note</span>
-                    <span className="w-7 h-4 bg-emerald-500/80 rounded-full inline-block" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: InspireMe */}
-              <div className="bg-slate-900 p-4 rounded-2xl border border-red-500/50 text-left space-y-3 ring-1 ring-red-500/30">
-                <div className="text-xs font-bold text-red-400 border-b border-slate-800 pb-2">InspireMe</div>
-                <div className="space-y-3 pt-1">
-                  <div className="text-xs font-extrabold text-white leading-snug">
-                    Complete a Mindful Mission
-                  </div>
-                  <div className="text-[10px] text-slate-400">InspireMe</div>
-                  <div className="pt-4 flex justify-end">
-                    <span className="w-8 h-4 bg-red-500 rounded-full inline-block shadow-md shadow-red-500/40" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= TOUR 3 ================= */}
-        {step === 2 && (
-          <div className="text-center space-y-6 animate-fadeIn">
-            <h1 className="text-3xl font-black tracking-tight leading-snug">
-              The only mindfulness tool referenced in medical studies
-            </h1>
-
-            <div className="relative py-4 flex flex-col items-center">
-              <div className="w-32 h-32 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-6 relative">
-                <Brain className="w-16 h-16 stroke-[1.5]" />
-                <div className="absolute -top-2 -left-6 bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-xs font-extrabold text-white shadow-lg">
-                  Morning Focus <span className="text-red-400">2.5x</span>
-                </div>
-                <div className="absolute -top-2 -right-6 bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-xs font-extrabold text-white shadow-lg">
-                  Goal Completion <span className="text-red-400">+20%</span>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs text-slate-400 leading-relaxed max-w-xs">
-                Referenced in leading journals: Journal of Clinical Psychology, and mindfulness studies
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= CREATE 1/6: Set Start Time ================= */}
-        {step === 3 && (
           <div className="text-center space-y-6 animate-fadeIn">
             <h2 className="text-2xl font-black tracking-tight text-white">Set your start time</h2>
 
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 relative my-4 shadow-xl">
               <div className="flex items-center justify-center space-x-3 font-mono">
-                {/* Hours Picker */}
+                {/* Direct Hours Input */}
                 <div className="flex flex-col items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      let h = parseInt(hour, 10);
-                      h = h >= 12 ? 1 : h + 1;
-                      setHour(h.toString().padStart(2, '0'));
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={hour}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setHour(val);
                     }}
-                    className="p-2 text-slate-400 hover:text-amber-400 active:scale-95 transition"
-                  >
-                    <ChevronUp className="w-6 h-6" />
-                  </button>
-                  <div className="bg-slate-900 border border-slate-700 w-20 py-3 rounded-2xl text-3xl font-black text-amber-400 shadow-inner text-center">
-                    {hour}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      let h = parseInt(hour, 10);
-                      h = h <= 1 ? 12 : h - 1;
-                      setHour(h.toString().padStart(2, '0'));
+                    onBlur={() => {
+                      let num = parseInt(hour, 10);
+                      if (isNaN(num) || num < 1) num = 7;
+                      if (num > 12) num = 12;
+                      setHour(num.toString().padStart(2, '0'));
                     }}
-                    className="p-2 text-slate-400 hover:text-amber-400 active:scale-95 transition"
-                  >
-                    <ChevronDown className="w-6 h-6" />
-                  </button>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-1">Hour</span>
+                    className="bg-slate-900 border border-slate-700 w-24 py-3 rounded-2xl text-4xl font-black text-red-500 shadow-inner text-center focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30 transition"
+                  />
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ሰዓት</span>
                 </div>
 
-                <span className="text-3xl font-black text-slate-500 pb-5">:</span>
+                <span className="text-4xl font-black text-slate-500 pb-5">:</span>
 
-                {/* Minutes Picker */}
+                {/* Direct Minutes Input */}
                 <div className="flex flex-col items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      let m = parseInt(minute, 10);
-                      m = (m + 5) % 60;
-                      setMinute(m.toString().padStart(2, '0'));
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={minute}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setMinute(val);
                     }}
-                    className="p-2 text-slate-400 hover:text-amber-400 active:scale-95 transition"
-                  >
-                    <ChevronUp className="w-6 h-6" />
-                  </button>
-                  <div className="bg-slate-900 border border-slate-700 w-20 py-3 rounded-2xl text-3xl font-black text-amber-400 shadow-inner text-center">
-                    {minute}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      let m = parseInt(minute, 10);
-                      m = (m - 5 + 60) % 60;
-                      setMinute(m.toString().padStart(2, '0'));
+                    onBlur={() => {
+                      let num = parseInt(minute, 10);
+                      if (isNaN(num) || num < 0) num = 0;
+                      if (num > 59) num = 59;
+                      setMinute(num.toString().padStart(2, '0'));
                     }}
-                    className="p-2 text-slate-400 hover:text-amber-400 active:scale-95 transition"
-                  >
-                    <ChevronDown className="w-6 h-6" />
-                  </button>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-1">Minute</span>
+                    className="bg-slate-900 border border-slate-700 w-24 py-3 rounded-2xl text-4xl font-black text-red-500 shadow-inner text-center focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30 transition"
+                  />
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ደቂቃ</span>
                 </div>
 
                 {/* AM / PM Toggle */}
-                <div className="flex flex-col items-center justify-center pb-5 pl-2">
+                <div className="flex flex-col items-center">
                   <button
                     type="button"
-                    onClick={() => setPeriod(period === 'AM' ? 'p.m.' : 'AM')}
-                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 font-bold px-3 py-2 rounded-xl text-sm transition active:scale-95 shadow-md"
+                    onClick={() => setPeriod(period === 'AM' ? 'PM' : 'AM')}
+                    className="bg-red-500 hover:bg-red-600 text-white font-black h-[66px] w-20 rounded-2xl text-2xl transition active:scale-95 shadow-md shadow-red-500/20 flex items-center justify-center"
                   >
                     {period}
                   </button>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">Period</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ክፍለ-ጊዜ</span>
                 </div>
               </div>
 
-              {/* Quick Presets */}
-              <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-center space-x-2 overflow-x-auto pb-1">
-                {[
-                  { h: '06', m: '00', p: 'AM' as const },
-                  { h: '07', m: '00', p: 'AM' as const },
-                  { h: '08', m: '00', p: 'AM' as const },
-                  { h: '09', m: '30', p: 'AM' as const },
-                ].map((preset) => (
-                  <button
-                    key={`${preset.h}:${preset.m}-${preset.p}`}
-                    type="button"
-                    onClick={() => {
-                      setHour(preset.h);
-                      setMinute(preset.m);
-                      setPeriod(preset.p);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                      hour === preset.h && minute === preset.m && period === preset.p
-                        ? 'bg-amber-500 text-slate-950 font-black shadow'
-                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                  >
-                    {preset.h}:{preset.m} {preset.p}
-                  </button>
-                ))}
-              </div>
+
             </div>
 
             <p className="text-xs text-slate-400 flex items-center justify-center space-x-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Selected Start Time: <strong className="text-amber-400 font-extrabold">{hour}:{minute} {period}</strong></span>
+              <Clock className="w-3.5 h-3.5 text-red-400" />
+              <span>የተመረጠው ሰዓት: <strong className="text-red-400 font-extrabold">{hour}:{minute} {period}</strong></span>
             </p>
           </div>
         )}
 
-        {/* ================= CREATE 2/6: Notification Modal ================= */}
-        {step === 4 && (
-          <div className="text-center space-y-6 animate-fadeIn relative">
-            <h2 className="text-2xl font-black tracking-tight text-white">Ensure essential motivation delivery</h2>
-
-            {/* Centered System Notification Dialog Modal matching screenshot */}
-            <div className="my-6 bg-[#1b1d22] border border-slate-700/80 rounded-3xl p-6 text-center space-y-4 shadow-2xl relative">
-              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mx-auto">
-                <Bell className="w-6 h-6 animate-pulse" />
-              </div>
-
-              <h3 className="text-lg font-bold text-white tracking-tight">Allow Notifications</h3>
-              <p className="text-xs text-slate-300 leading-relaxed px-2">
-                See Motivation Alerts. If alerts are off, you won't get your daily missions.
-              </p>
-
-              {notificationAllowed ? (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-bold flex items-center justify-center space-x-2">
-                  <Check className="w-4 h-4" />
-                  <span>Notifications Allowed for Motivation Alerts</span>
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-medium">
-                  Alerts are currently disabled. Tap Allow below to enable daily missions.
-                </div>
-              )}
-
-              <div className="pt-3 flex items-center justify-around border-t border-slate-700/60 font-semibold text-xs">
-                <button
-                  type="button"
-                  onClick={() => setNotificationAllowed(false)}
-                  className={`px-4 py-2.5 rounded-xl transition ${!notificationAllowed ? 'text-red-400 font-bold bg-red-500/10 ring-1 ring-red-500/30' : 'text-slate-400 hover:text-white'}`}
-                >
-                  Don't Allow
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setNotificationAllowed(true);
-                    if ('Notification' in window) {
-                      try {
-                        const perm = await Notification.requestPermission();
-                        if (perm === 'granted') {
-                          setNotificationAllowed(true);
-                        }
-                      } catch (err) {
-                        console.log('Notification permission request handled');
-                      }
-                    }
-                  }}
-                  className={`relative px-5 py-2.5 rounded-xl font-bold transition flex items-center space-x-1.5 active:scale-95 ${
-                    notificationAllowed ? 'text-white bg-sky-500 shadow-lg shadow-sky-500/30 ring-2 ring-sky-400' : 'text-slate-300 bg-slate-800 hover:bg-slate-700'
-                  }`}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Allow</span>
-                  <div className="absolute -bottom-3 -right-2 pointer-events-none animate-bounce">
-                    <span className="text-2xl">👆</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= CREATE 3/6: Inspiration Theme ================= */}
-        {step === 5 && (
-          <div className="space-y-4 animate-fadeIn">
-            {/* Header Badge & Title */}
-            <div className="text-center space-y-1">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Inspiration Gallery</span>
-              </div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Choose your inspiration theme</h2>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Select an immersive aesthetic wallpaper & soundscape for your alarm
-              </p>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex justify-center space-x-2 pt-1">
-              {[
-                { id: 'ALL', label: 'All Themes' },
-                { id: 'Trending', label: '💖 Trending' },
-                { id: 'Goal Focus', label: '🔥 Goal Focus' },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setThemeCategoryFilter(cat.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                    themeCategoryFilter === cat.id
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-extrabold'
-                      : 'bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-white'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Modern Theme Card Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[48vh] overflow-y-auto pr-1 pb-2">
-              {THEMES_DATA.filter(
-                (t) => themeCategoryFilter === 'ALL' || t.category === themeCategoryFilter
-              ).map((wp) => {
-                const isSelected = selectedTheme === wp.id;
-                const isPlaying = previewingThemeId === wp.id;
-
-                return (
-                  <div
-                    key={wp.id}
-                    onClick={() => {
-                      setSelectedTheme(wp.id);
-                      if ('vibrate' in navigator) {
-                        try { navigator.vibrate(40); } catch (e) {}
-                      }
-                    }}
-                    className={`group relative p-3 rounded-2xl border text-left flex flex-col justify-between h-36 cursor-pointer transition-all duration-200 overflow-hidden bg-[#18191d] ${
-                      isSelected
-                        ? 'border-amber-400 ring-2 ring-amber-400/80 shadow-xl shadow-amber-500/20 scale-[1.02] bg-[#22242a]'
-                        : 'border-slate-800/90 hover:border-slate-700 hover:bg-[#1f2026] hover:scale-[1.01]'
-                    }`}
-                  >
-                    {/* Top row: Emoji avatar + Selection checkmark */}
-                    <div className="flex items-center justify-between">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-950/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-xl shadow-md">
-                        {wp.imageEmoji}
-                      </div>
-
-                      {isSelected ? (
-                        <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-black flex items-center justify-center shadow-lg shadow-amber-500/30">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      ) : (
-                        <div className="w-5 h-5 rounded-full border border-white/20 group-hover:border-slate-400 transition" />
-                      )}
-                    </div>
-
-                    {/* Middle: Theme Name */}
-                    <div className="my-auto pt-1">
-                      <div className="text-xs font-bold text-white leading-snug truncate">
-                        {wp.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                        {wp.category}
-                      </div>
-                    </div>
-
-                    {/* Bottom Row: Sound tag & preview button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleThemeAudio(e, wp)}
-                      className={`w-full py-1.5 px-2 rounded-xl text-[10px] font-bold border transition flex items-center justify-between ${
-                        isPlaying
-                          ? 'bg-amber-500 text-slate-950 border-amber-400'
-                          : 'bg-slate-950/60 backdrop-blur-md text-slate-300 border-white/10 hover:border-amber-500/40 hover:text-amber-400'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-1.5 min-w-0">
-                        <Volume2 className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{wp.soundTag}</span>
-                      </div>
-                      {isPlaying ? (
-                        <Square className="w-3 h-3 fill-current shrink-0 animate-pulse" />
-                      ) : (
-                        <Play className="w-3 h-3 shrink-0" />
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ================= CREATE 4/6: Mission Category ================= */}
-        {step === 6 && (
+        {/* ================= CREATE 2/4: Mission Category ================= */}
+        {step === 1 && (
           <div className="space-y-4 animate-fadeIn">
             <h2 className="text-2xl font-black text-center text-white">Choose a mission category</h2>
 
             <div className="space-y-2.5">
               {[
-                { id: 'math', name: 'Mindful Breathing', icon: <Wind className="w-5 h-5 text-sky-400" /> },
-                { id: 'tiles', name: 'Focus Game', icon: <Target className="w-5 h-5 text-teal-400" /> },
-                { id: 'typing', name: 'Gratitude Journaling', icon: <FileText className="w-5 h-5 text-amber-400" /> },
-                { id: 'shake', name: 'Active Stretching', icon: <Activity className="w-5 h-5 text-purple-400" /> },
-                { id: 'none', name: 'No Mission', icon: <X className="w-5 h-5 text-slate-500" /> },
+                { id: 'math', name: 'Mindful Breathing', icon: <Wind className="w-5 h-5 text-white" /> },
+                { id: 'tiles', name: 'Focus Game', icon: <Target className="w-5 h-5 text-white" /> },
+                { id: 'typing', name: 'Gratitude Journaling', icon: <FileText className="w-5 h-5 text-white" /> },
+                { id: 'shake', name: 'Active Stretching', icon: <Activity className="w-5 h-5 text-white" /> },
+                { id: 'none', name: 'No Mission', icon: <X className="w-5 h-5 text-slate-400" /> },
               ].map((m) => (
                 <div
                   key={m.id}
@@ -726,8 +367,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           </div>
         )}
 
-        {/* ================= CREATE 5/6: Wake-Up Audio ================= */}
-        {step === 7 && (
+        {/* ================= CREATE 3/4: Wake-Up Audio ================= */}
+        {step === 2 && (
           <div className="space-y-4 animate-fadeIn">
             <h2 className="text-2xl font-black text-center text-white">Select your wake-up audio</h2>
 
@@ -783,8 +424,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           </div>
         )}
 
-        {/* ================= CREATE 6/6: Finalize Motivation Alert ================= */}
-        {step === 8 && (
+        {/* ================= CREATE 4/4: Finalize Motivation Alert ================= */}
+        {step === 3 && (
           <div className="space-y-5 animate-fadeIn">
             <h2 className="text-2xl font-black text-center text-white">Finalize your motivation alert</h2>
 
@@ -849,7 +490,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
             onClick={handleBack}
             className="w-1/3 bg-slate-900 hover:bg-slate-800 text-slate-200 font-extrabold text-sm py-3.5 rounded-2xl border border-slate-700/80 transition active:scale-95 flex items-center justify-center space-x-1.5 shadow-md"
           >
-            <RotateCcw className="w-4 h-4 text-amber-400" />
+            <RotateCcw className="w-4 h-4 text-white" />
             <span>Undo</span>
           </button>
         )}
@@ -863,9 +504,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           } bg-red-500 hover:bg-red-400 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-red-500/30 transition active:scale-95 flex items-center justify-center space-x-2`}
         >
           <span>
-            {step === 2
-              ? 'Begin Your Journey'
-              : step === 8
+            {step === 3
               ? 'Set and Go'
               : 'Next'}
           </span>

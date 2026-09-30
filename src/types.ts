@@ -1,4 +1,4 @@
-export type TabType = 'alarm' | 'sleep' | 'morning' | 'report' | 'settings';
+export type TabType = 'alarm' | 'sleep' | 'morning' | 'settings';
 
 export interface PetState {
   name: string;

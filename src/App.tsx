@@ -21,7 +21,6 @@ import { MorningTab } from './components/MorningTab';
 import { SleepCalculator } from './components/SleepCalculator';
 import { AmbientSoundscape } from './components/AmbientSoundscape';
 import { NightstandClock } from './components/NightstandClock';
-import { WakeStats } from './components/WakeStats';
 import { OnboardingTour } from './components/OnboardingTour';
 import { SettingsView } from './components/SettingsView';
 
@@ -33,7 +32,7 @@ export default function App() {
 
   // Language state
   const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('alarmy_language') as Language) || 'en';
+    return 'am';
   });
 
   useEffect(() => {
@@ -194,7 +193,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0e0f12] text-slate-100 font-sans antialiased selection:bg-red-500 selection:text-white">
       {/* Navbar Header */}
       <Navbar
         activeTab={activeTab}
@@ -222,6 +221,7 @@ export default function App() {
                 onUpdateAlarm={handleUpdateAlarm}
                 onDeleteAlarm={handleDeleteAlarm}
                 nextAlarmTime={getNextAlarmTime()}
+                language={language}
               />
             </motion.div>
           )}
@@ -234,7 +234,7 @@ export default function App() {
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
             >
-              <SleepCalculator onSetAlarm={handleSetQuickAlarm} />
+              <SleepCalculator onSetAlarm={handleSetQuickAlarm} language={language} />
             </motion.div>
           )}
 
@@ -250,22 +250,7 @@ export default function App() {
                 routine={routine}
                 onToggleStep={handleToggleStep}
                 onSelectTab={setActiveTab}
-              />
-            </motion.div>
-          )}
-
-          {(activeTab === 'report' || activeTab === 'stats') && (
-            <motion.div
-              key="report"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              <WakeStats
-                logs={logs}
-                onAddLog={handleAddLog}
-                onSetAlarmClick={() => setActiveTab('alarm')}
+                language={language}
               />
             </motion.div>
           )}
@@ -294,6 +279,7 @@ export default function App() {
         <NightstandClock
           onClose={() => setIsNightstandMode(false)}
           nextAlarmTime={getNextAlarmTime()}
+          language={language}
         />
       )}
 
@@ -303,6 +289,7 @@ export default function App() {
           alarm={ringingAlarm}
           onDismiss={() => setRingingAlarm(null)}
           onSnooze={handleSnooze}
+          language={language}
         />
       )}
     </div>

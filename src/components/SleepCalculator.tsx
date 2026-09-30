@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Clock, Check, ChevronRight, Mic, Play, Pause, Activity, Volume2 } from 'lucide-react';
+import { Language } from '../utils/translations';
 
 interface SleepCalculatorProps {
   onSetAlarm: (time: string, label: string) => void;
+  language?: Language;
 }
 
-export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) => {
+export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm, language = 'en' }) => {
+  const isAm = language === 'am';
   const [isTracking, setIsTracking] = useState(false);
   const [trackingDuration, setTrackingDuration] = useState(0);
   const [snoreEvents, setSnoreEvents] = useState(2);
@@ -50,7 +53,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
         const minutesToSubtract = cycles * CYCLE_MINUTES + FALL_ASLEEP_BUFFER;
         const sleepDate = new Date(date.getTime() - minutesToSubtract * 60000);
         const timeStr = sleepDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        const hoursText = `${(cycles * 1.5).toFixed(1)} hours`;
+        const hoursText = `${(cycles * 1.5).toFixed(1)} ${isAm ? 'ሰዓት' : 'hours'}`;
         const score = cycles >= 5 ? 'Optimal' : cycles === 4 ? 'Good' : 'Minimum';
         results.push({ time: timeStr, cycles, hours: hoursText, score });
       });
@@ -59,7 +62,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
         const minutesToAdd = cycles * CYCLE_MINUTES + FALL_ASLEEP_BUFFER;
         const wakeDate = new Date(date.getTime() + minutesToAdd * 60000);
         const timeStr = wakeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        const hoursText = `${(cycles * 1.5).toFixed(1)} hours`;
+        const hoursText = `${(cycles * 1.5).toFixed(1)} ${isAm ? 'ሰዓት' : 'hours'}`;
         const score = cycles >= 5 ? 'Optimal' : cycles === 4 ? 'Good' : 'Minimum';
         results.push({ time: timeStr, cycles, hours: hoursText, score });
       });
@@ -78,16 +81,16 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
 
   return (
     <div id="sleep-view" className="space-y-6 pb-24 max-w-md mx-auto">
-      <h2 className="text-2xl font-black text-white px-1">Sleep</h2>
+      <h2 className="text-2xl font-black text-white px-1">{isAm ? 'እንቅልፍ' : 'Sleep'}</h2>
 
       {/* Main Sleep Tracking Banner matching Image 2 */}
       <div className="bg-[#1c1d22] border border-slate-800/90 rounded-3xl p-6 text-center space-y-4 shadow-xl">
         <div>
           <h3 className="text-xl font-bold text-white mb-1">
-            Find out what you did in your sleep
+            {isAm ? 'በእንቅልፍዎ ወቅት ምን እንዳደረጉ ይወቁ' : 'Find out what you did in your sleep'}
           </h3>
           <p className="text-xs text-slate-400">
-            Check your tossing, snoring sounds
+            {isAm ? 'የመገልበጥ እና የእኮሮፋ ድምፆችን ይፈትሹ' : 'Track tossing, turning and snoring sounds'}
           </p>
         </div>
 
@@ -95,7 +98,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
         <div className="bg-[#15161a] border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div className="text-left">
             <div className="text-xs font-mono text-slate-400">am 01:26</div>
-            <div className="text-xs font-bold text-slate-200">Very loud</div>
+            <div className="text-xs font-bold text-slate-200">{isAm ? 'በጣም ከፍተኛ' : 'Very High'}</div>
           </div>
 
           {/* Audio Waveform Visual Bars */}
@@ -117,14 +120,26 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
           onClick={() => setIsTracking(!isTracking)}
           className="w-full bg-white hover:bg-slate-100 text-slate-950 font-black text-base py-3.5 rounded-full shadow-lg transition active:scale-95 flex items-center justify-center space-x-2"
         >
-          <Mic className={`w-5 h-5 ${isTracking ? 'text-red-500 animate-pulse' : 'text-slate-900'}`} />
-          <span>{isTracking ? `Stop Tracking (${formatDuration(trackingDuration)})` : 'Track my sleep'}</span>
+          <Mic className="w-5 h-5 text-slate-900" />
+          <span>
+            {isTracking
+              ? isAm
+                ? `መከታተል አቁም (${formatDuration(trackingDuration)})`
+                : `Stop Tracking (${formatDuration(trackingDuration)})`
+              : isAm
+              ? 'እንቅልፌን ተከታተል'
+              : 'Track My Sleep'}
+          </span>
         </button>
 
         {isTracking && (
-          <div className="text-xs text-indigo-400 font-semibold flex items-center justify-center space-x-2 animate-pulse">
-            <Activity className="w-4 h-4" />
-            <span>Listening for sleep sounds & snoring...</span>
+          <div className="text-xs text-white font-semibold flex items-center justify-center space-x-2 animate-pulse">
+            <Activity className="w-4 h-4 text-white" />
+            <span>
+              {isAm
+                ? 'የእንቅልፍ ድምፆችን እና እኮሮፋዎችን በማዳመጥ ላይ...'
+                : 'Listening for sleep sounds and snoring...'}
+            </span>
           </div>
         )}
       </div>
@@ -136,7 +151,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
       >
         <div className="flex items-center space-x-3 text-sm font-bold text-white">
           <span className="text-sky-400 text-lg">🌙</span>
-          <span>My sleep report</span>
+          <span>{isAm ? 'የእንቅልፍ ሪፖርቴ' : 'My Sleep Report'}</span>
         </div>
         <ChevronRight className="w-5 h-5 text-slate-500" />
       </button>
@@ -145,25 +160,25 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
       <div className="bg-[#1c1d22] p-5 rounded-3xl border border-slate-800/90 space-y-4">
         <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
           <Moon className="w-4 h-4 text-indigo-400" />
-          <span>REM Cycle Optimization</span>
+          <span>{isAm ? 'የREM ዑደት ማስተካከያ' : 'REM Cycle Calculator'}</span>
         </div>
 
         <div className="flex bg-[#121316] p-1 rounded-xl border border-slate-800">
           <button
             onClick={() => setMode('wake')}
             className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
-              mode === 'wake' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400'
+              mode === 'wake' ? 'bg-red-500 text-white shadow-md' : 'text-slate-400'
             }`}
           >
-            Wake Up At
+            {isAm ? 'በዚህ ሰዓት ንቃ' : 'Wake Up At'}
           </button>
           <button
             onClick={() => setMode('sleep')}
             className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
-              mode === 'sleep' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'
+              mode === 'sleep' ? 'bg-red-500 text-white shadow-md' : 'text-slate-400'
             }`}
           >
-            Sleep At
+            {isAm ? 'በዚህ ሰዓት ተኛ' : 'Sleep At'}
           </button>
         </div>
 
@@ -172,7 +187,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
             type="time"
             value={targetTime}
             onChange={(e) => setTargetTime(e.target.value)}
-            className="bg-[#121316] border border-slate-700 rounded-2xl px-4 py-2 text-2xl font-mono text-center text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 max-w-[180px] mx-auto block"
+            className="bg-[#121316] border border-slate-700 rounded-2xl px-4 py-2 text-2xl font-mono text-center text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 max-w-[180px] mx-auto block"
           />
         </div>
 
@@ -185,18 +200,22 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
             >
               <div>
                 <div className="text-lg font-mono font-bold text-white">{opt.time}</div>
-                <div className="text-[11px] text-slate-400">{opt.hours} ({opt.cycles} cycles)</div>
+                <div className="text-[11px] text-slate-400">
+                  {opt.hours} ({opt.cycles} {isAm ? 'ዑደቶች' : 'cycles'})
+                </div>
               </div>
 
               <button
                 onClick={() => handleQuickAlarm(opt.time, opt.cycles)}
                 className={`px-3 py-1.5 rounded-xl font-bold text-xs transition ${
                   alarmSetTime === opt.time
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-800 text-amber-400 hover:bg-amber-500 hover:text-slate-950'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white'
                 }`}
               >
-                {alarmSetTime === opt.time ? 'Set!' : 'Set Alarm'}
+                {alarmSetTime === opt.time
+                  ? isAm ? 'ተዘጋጅቷል!' : 'Set!'
+                  : isAm ? 'ማንቂያ አዘጋጅ' : 'Set Alarm'}
               </button>
             </div>
           ))}
@@ -209,20 +228,22 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
           <div className="max-w-md w-full bg-[#1c1d22] border border-slate-800 rounded-3xl p-6 space-y-4 text-white">
             <h3 className="text-xl font-extrabold flex items-center space-x-2">
               <span>🌙</span>
-              <span>My Sleep Report</span>
+              <span>{isAm ? 'የእንቅልፍ ሪፖርቴ' : 'My Sleep Report'}</span>
             </h3>
 
             <div className="bg-[#121316] p-4 rounded-2xl space-y-2 text-sm">
               <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Total Sleep Recorded:</span>
-                <span className="font-bold text-white">7 hr 15 min</span>
+                <span className="text-slate-400">{isAm ? 'የተመዘገበው ጠቅላላ እንቅልፍ:' : 'Total Recorded Sleep:'}</span>
+                <span className="font-bold text-white">{isAm ? '7 ሰዓት ከ15 ደቂቃ' : '7h 15m'}</span>
               </div>
               <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Snoring Events Detected:</span>
-                <span className="font-bold text-amber-400">{snoreEvents} events</span>
+                <span className="text-slate-400">{isAm ? 'የተገኙ የእኮሮፋ ድምፆች:' : 'Detected Snoring:'}</span>
+                <span className="font-bold text-amber-400">
+                  {snoreEvents} {isAm ? 'ድምፆች' : 'events'}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Sleep Score:</span>
+                <span className="text-slate-400">{isAm ? 'የእንቅልፍ ውጤት:' : 'Sleep Score:'}</span>
                 <span className="font-bold text-emerald-400">88 / 100</span>
               </div>
             </div>
@@ -231,7 +252,7 @@ export const SleepCalculator: React.FC<SleepCalculatorProps> = ({ onSetAlarm }) 
               onClick={() => setShowReportModal(false)}
               className="w-full py-3 bg-red-500 hover:bg-red-400 text-white font-bold rounded-2xl transition"
             >
-              Close Report
+              {isAm ? 'ሪፖርቱን ዝጋ' : 'Close Report'}
             </button>
           </div>
         </div>
