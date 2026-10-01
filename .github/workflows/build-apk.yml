@@ -45,6 +45,11 @@ jobs:
       - name: Install web dependencies
         run: npm ci
 
+      # Runtime harness for the strict volume lock, including the JS <-> native
+      # hardware-button-lock contract (against a fake plugin).
+      - name: Run web tests
+        run: npm test
+
       - name: Build the web bundle
         run: npm run build
 
@@ -99,6 +104,39 @@ jobs:
             echo "build-tools: $(ls -1 "$SDK/build-tools" 2>&1 | tr '\n' ' ')"
           } | while IFS= read -r line; do echo "::notice::$line"; done
 
+      # Plain-JVM tests (no emulator) for the native hardware-button lock: which keys
+      # are swallowed, lease expiry, counters. Sources: android/app/src/test.
+      - name: Run native unit tests
+        id: unit_tests
+        run: |
+          set -o pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest 2>&1 | tee gradle.log
+
+      # Surfaces the test counts as an annotation, and fails if Gradle ran no tests at all
+      # (a green test task with "NO-SOURCE" would otherwise look exactly like success).
+      - name: Summarise native unit tests
+        if: always() && steps.unit_tests.outcome != 'skipped'
+        run: |
+          set -uo pipefail
+          python3 - android/app/build/test-results/testDebugUnitTest <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob(sys.argv[1] + '/*.xml')
+          tests = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              tests += int(root.get('tests', 0))
+              failures += int(root.get('failures', 0))
+              errors += int(root.get('errors', 0))
+              skipped += int(root.get('skipped', 0))
+          if not files or tests == 0:
+              print('::error::No native unit tests ran - check android/app/src/test')
+              sys.exit(1)
+          print(f'::notice::Native unit tests: {tests} run, {failures} failed, {errors} errors, {skipped} skipped ({len(files)} classes)')
+          sys.exit(1 if failures or errors else 0)
+          PY
+
       - name: Assemble the APK
         id: assemble
         run: |
@@ -114,7 +152,7 @@ jobs:
       # The interesting part of a Gradle failure is echoed as job annotations so
       # it is readable straight from the run without downloading the full log.
       - name: Report the Gradle failure
-        if: failure() && steps.assemble.outcome == 'failure'
+        if: failure() && (steps.unit_tests.outcome == 'failure' || steps.assemble.outcome == 'failure')
         run: |
           set -uo pipefail
           if [ ! -f android/gradle.log ]; then

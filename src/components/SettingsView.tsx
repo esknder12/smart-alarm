@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
 import { APP_NAME, APP_VERSION } from '../constants';
+import { nativeAlarmLock } from '../utils/alarmLock';
 import {
   getNotificationStatus,
   requestNotificationPermission,
@@ -52,6 +53,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const t = translations[language];
   const isAm = language === 'am';
+  // True only inside the Android app, where the physical volume keys and Back really are blocked.
+  const nativeLock = nativeAlarmLock.isAvailable();
 
   // Notification status state
   const [notifStatus, setNotifStatus] = useState<NotificationStatus>({ isSupported: true, permission: 'default' });
@@ -475,9 +478,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         {isAm ? 'የድምፅ መቀነሻ ተቆልፏል — ፈተናውን እስኪጨርሱ ድረስ' : 'Volume down is locked until the mission is solved'}
                       </div>
                       <p className="text-slate-300 mt-1 leading-relaxed">
-                        {isAm
-                          ? 'ማንቂያው ሲደውል የድምፅ መቀነሻ እና የዝምታ ቁልፎች ተይዘው አይሰሩም። ድምፅ መቀነስ ከሞከሩ ማንቂያው ይበልጥ ይጮሃል።'
-                          : 'While the alarm rings, volume-down and mute keys are swallowed and ignored. Trying to turn the alarm down makes it louder instead.'}
+                        {nativeLock
+                          ? (isAm
+                              ? 'ማንቂያው ሲደውል የስልኩ የድምፅ መቀነሻ፣ መጨመሪያ እና የዝምታ ቁልፎች እንዲሁም ተመለስ ቁልፍ አይሰሩም፣ ስክሪኑም ብርሃኑን አይቀንስም። ለማጥፋት ፈተናውን መፍታት ግዴታ ነው።'
+                              : 'While the alarm rings, the phone\'s volume-down, volume-up and mute buttons and the Back button do nothing, and the screen stays on. The only way to switch the alarm off is to solve the mission.')
+                          : (isAm
+                              ? 'ማንቂያው ሲደውል የድምፅ መቀነሻ እና የዝምታ ቁልፎች ተይዘው አይሰሩም። ድምፅ መቀነስ ከሞከሩ ማንቂያው ይበልጥ ይጮሃል።'
+                              : 'While the alarm rings, volume-down and mute keys are swallowed and ignored. Trying to turn the alarm down makes it louder instead.')}
                       </p>
                     </div>
                   </div>
@@ -487,12 +494,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       {isAm ? 'በማንቂያ ጊዜ የሚከለከሉ' : 'Blocked while ringing'}
                     </div>
                     {[
+                      ...(nativeLock
+                        ? [
+                            isAm ? 'የስልኩ አካላዊ የድምፅ መቀነሻ / መጨመሪያ / ዝምታ ቁልፎች (በአንድሮይድ በቀጥታ ይታገዳሉ)' : 'Physical volume-down / volume-up / mute buttons (blocked natively on Android)',
+                            isAm ? 'ተመለስ ቁልፍ — ከማንቂያ ገፁ መውጣት አይቻልም' : 'Back button — the alarm screen cannot be left',
+                          ]
+                        : []),
                       isAm ? 'የድምፅ መቀነሻ / ዝምታ ቁልፎች (keydown, capture phase)' : 'Volume-down / mute keys (keydown, capture phase)',
                       isAm ? 'የጆሮ ማዳመጫ እና የሎክ ስክሪን መቆጣጠሪያዎች (MediaSession)' : 'Headset & lock-screen transport controls (MediaSession)',
                       isAm ? 'የድምፅ ማቀፊያ መቆም (AudioContext watchdog በየ200ms)' : 'AudioContext suspension / background throttling (200 ms watchdog)',
                       isAm ? 'የቪዲዮ/ድምፅ ኤለመንት mute እና volume መቀነስ' : 'Media element mute / volume reduction',
                       isAm ? 'በፈተና ሳይጠናቀቅ snooze ማድረግ' : 'Snoozing before the mission is solved',
-                      isAm ? 'ማንቂያው እየደወለ ገፁን መዝጋት/መጫን' : 'Closing or reloading the page while ringing',
+                      // The unload prompt only exists in browsers; an Android WebView shows none, and
+                      // nothing stops the user swiping the app away, so do not claim it there.
+                      ...(nativeLock
+                        ? []
+                        : [isAm ? 'ማንቂያው እየደወለ ገፁን መዝጋት/መጫን' : 'Closing or reloading the page while ringing']),
                     ].map((item) => (
                       <div key={item} className="flex items-start space-x-2 text-slate-300">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -527,9 +544,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <span>{isAm ? 'ግልጽ ማብራሪያ' : 'Honest limitation'}</span>
                     </div>
                     <p className="text-slate-300 mt-1.5 leading-relaxed">
-                      {isAm
-                        ? 'የስልኩ አካላዊ የድምፅ ቁልፍ (volume rocker) በስርዓቱ ላይ በቀጥታ ስለሚሰራ የዌብ መተግበሪያ ሊይዘው አይችልም። ስለዚህ መተግበሪያው የሚችለውን ሁሉ ይቆልፋል፣ እንዲሁም ድምፅ ሲቀነስ ማንቂያውን የበለጠ ያጮሃል፣ ሲረን ይጨምራል፣ ስክሪኑን አብርቶ ይይዛል እና ስልኩ ይንቀጠቀጣል።'
-                        : 'The phone\'s physical volume rocker is handled by the operating system before the page ever sees it, so a web app cannot block it — that needs a native app with system audio-session control. This app therefore blocks everything a browser exposes, and when the alarm is silenced it fights back: louder gain, a siren layer, a held screen wake lock and repeated vibration.'}
+                      {nativeLock
+                        ? (isAm
+                            ? 'የHome፣ Recents እና የኃይል (power) ቁልፎች የአንድሮይድ ስርዓት ስለሆኑ አፕ ሊከለክላቸው አይችልም። ማንቂያው ሲጮህ ስክሪኑ ጠፍቶ ከሆነ ወይም Niqu በስክሪኑ ላይ ካልሆነ፣ የድምፅ ቁልፎችን ስርዓቱ ራሱ ይቆጣጠራቸዋል። ማንቂያውን በሚጠብቁበት ጊዜ መተግበሪያውን ክፍት እና ስክሪኑን አብርተው ያቆዩት።'
+                            : 'Android itself owns the Home, Recents and power buttons, so no app can block those. If the screen is off or Niqu is not on screen when the alarm rings, the system handles the volume keys itself. While you wait for an alarm, keep the app open with the screen on.')
+                        : (isAm
+                            ? 'የስልኩ አካላዊ የድምፅ ቁልፍ (volume rocker) በስርዓቱ ላይ በቀጥታ ስለሚሰራ የዌብ መተግበሪያ ሊይዘው አይችልም። ይህ የሚቻለው በአንድሮይድ መተግበሪያው ብቻ ነው። ስለዚህ እዚህ መተግበሪያው የሚችለውን ሁሉ ይቆልፋል፣ እንዲሁም ድምፅ ሲቀነስ ማንቂያውን የበለጠ ያጮሃል፣ ሲረን ይጨምራል፣ ስክሪኑን አብርቶ ይይዛል እና ስልኩ ይንቀጠቀጣል።'
+                            : 'The phone\'s physical volume rocker is handled by the operating system before the page ever sees it, so a web page cannot block it — only the Android app can. In a browser this app therefore blocks everything a browser exposes, and when the alarm is silenced it fights back: louder gain, a siren layer, a held screen wake lock and repeated vibration.')}
                     </p>
                   </div>
 
