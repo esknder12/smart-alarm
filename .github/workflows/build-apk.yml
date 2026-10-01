@@ -45,6 +45,11 @@ jobs:
       - name: Install web dependencies
         run: npm ci
 
+      # Runtime harness for the strict volume lock, including the JS <-> native
+      # hardware-button-lock contract (against a fake plugin).
+      - name: Run web tests
+        run: npm test
+
       - name: Build the web bundle
         run: npm run build
 
@@ -99,6 +104,16 @@ jobs:
             echo "build-tools: $(ls -1 "$SDK/build-tools" 2>&1 | tr '\n' ' ')"
           } | while IFS= read -r line; do echo "::notice::$line"; done
 
+      # Plain-JVM tests (no emulator) for the native hardware-button lock: which keys
+      # are swallowed, lease expiry, counters. Sources: android/app/src/test.
+      - name: Run native unit tests
+        id: unit_tests
+        run: |
+          set -o pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest 2>&1 | tee gradle.log
+
       - name: Assemble the APK
         id: assemble
         run: |
@@ -114,7 +129,7 @@ jobs:
       # The interesting part of a Gradle failure is echoed as job annotations so
       # it is readable straight from the run without downloading the full log.
       - name: Report the Gradle failure
-        if: failure() && steps.assemble.outcome == 'failure'
+        if: failure() && (steps.unit_tests.outcome == 'failure' || steps.assemble.outcome == 'failure')
         run: |
           set -uo pipefail
           if [ ! -f android/gradle.log ]; then
