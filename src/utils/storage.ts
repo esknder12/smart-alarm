@@ -50,6 +50,16 @@ const INITIAL_AMBIENTS: AmbientSound[] = [
   { id: 'a5', name: '432Hz Binaural Awakening', iconName: 'Sparkles', type: 'binaural', isPlaying: false, volume: 35 }
 ];
 
+/**
+ * True once the alarm list holds an alarm the user created, as opposed to the demo alarms every
+ * fresh install starts with. The first-run wizard uses this (plus its own flag) to decide whether
+ * the user still has to set an alarm - see utils/firstRun.ts.
+ */
+export const hasUserSetOwnAlarm = (alarms: Alarm[]): boolean => {
+  const seeded = new Set<string>(INITIAL_ALARMS.map((alarm) => alarm.id));
+  return alarms.some((alarm) => !seeded.has(alarm.id));
+};
+
 export const loadAlarms = (): Alarm[] => {
   try {
     const saved = localStorage.getItem('wakeup_alarms');

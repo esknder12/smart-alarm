@@ -7,6 +7,7 @@ import { APP_NAME } from './constants';
 import {
   loadAlarms,
   saveAlarms,
+  hasUserSetOwnAlarm,
   loadRoutine,
   saveRoutine,
   loadLogs,
@@ -28,13 +29,27 @@ import { SleepCalculator } from './components/SleepCalculator';
 import { AmbientSoundscape } from './components/AmbientSoundscape';
 import { NightstandClock } from './components/NightstandClock';
 import { OnboardingTour } from './components/OnboardingTour';
+import {
+  hasCompletedFirstRun,
+  markFirstRunComplete,
+  shouldShowFirstRunAlarmSetup,
+} from './utils/firstRun';
 import { SettingsView } from './components/SettingsView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('alarms');
   const [isNightstandMode, setIsNightstandMode] = useState<boolean>(false);
-  // Automatic Launch on Open: When opening the app, the 9-screen wizard tour immediately presents itself
-  const [showTour, setShowTour] = useState<boolean>(true);
+  // First launch ends with an alarm: the wizard is the only screen until the user sets one, and it
+  // stops coming back afterwards (it is still reachable from Settings for a re-run).
+  const [firstAlarmRequired, setFirstAlarmRequired] = useState<boolean>(() =>
+    shouldShowFirstRunAlarmSetup({
+      completed: hasCompletedFirstRun(),
+      hasOwnAlarm: hasUserSetOwnAlarm(loadAlarms()),
+    })
+  );
+  const [showTour, setShowTour] = useState<boolean>(firstAlarmRequired);
+  // Briefly rings the card of the alarm the wizard just created, so the user sees it landed.
+  const [highlightAlarmId, setHighlightAlarmId] = useState<string | null>(null);
 
   // Language state
   const [language, setLanguage] = useState<Language>(() => {
@@ -74,8 +89,17 @@ export default function App() {
   }, [alarms]);
 
   useEffect(() => {
+    // While the first-run wizard is up there is no real alarm yet: the two demo alarms every fresh
+    // install starts with must not be armed on the phone before the user picks a time themselves.
+    if (firstAlarmRequired) return;
     void nativeAlarmScheduler.sync(alarms);
-  }, [alarms]);
+  }, [alarms, firstAlarmRequired]);
+
+  useEffect(() => {
+    if (!highlightAlarmId) return;
+    const timeout = setTimeout(() => setHighlightAlarmId(null), 6000);
+    return () => clearTimeout(timeout);
+  }, [highlightAlarmId]);
 
   const openNativeRing = useCallback((info: RingingAlarmInfo) => {
     const alarm = alarmFromRingInfo(info, alarmsRef.current);
@@ -110,6 +134,9 @@ export default function App() {
   // Global Alarm Checker Loop (runs every second)
   useEffect(() => {
     const interval = setInterval(() => {
+      // Nothing may ring while the user is still setting their first alarm: the seeded demo alarms
+      // are placeholders, not times anybody chose.
+      if (firstAlarmRequired) return;
       const now = new Date();
       const currentHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       const currentDay = now.getDay(); // 0-6
@@ -132,7 +159,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [alarms, lastTriggeredTime]);
+  }, [alarms, lastTriggeredTime, firstAlarmRequired]);
 
   // Next Alarm Time helper
   const getNextAlarmTime = (): string | null => {
@@ -143,13 +170,31 @@ export default function App() {
   };
 
   // Handlers for Alarms
+  const buildAlarm = (newAlarmData: Omit<Alarm, 'id' | 'snoozeCount'>): Alarm => ({
+    ...newAlarmData,
+    id: Date.now().toString(),
+    snoozeCount: 0,
+  });
+
   const handleAddAlarm = (newAlarmData: Omit<Alarm, 'id' | 'snoozeCount'>) => {
-    const newAlarm: Alarm = {
-      ...newAlarmData,
-      id: Date.now().toString(),
-      snoozeCount: 0,
-    };
-    setAlarms([...alarms, newAlarm]);
+    setAlarms([...alarms, buildAlarm(newAlarmData)]);
+  };
+
+  /**
+   * The wizard finished. On the mandatory first run the alarm the user just configured replaces the
+   * seeded demo alarms (nothing may ring at a time they never chose); a re-run from Settings simply
+   * adds it. The flag is written last and never blocks the alarm itself.
+   */
+  const handleTourComplete = (newAlarmData?: Omit<Alarm, 'id' | 'snoozeCount'>) => {
+    if (newAlarmData) {
+      const created = buildAlarm(newAlarmData);
+      setAlarms(firstAlarmRequired ? [created] : [...alarms, created]);
+      setHighlightAlarmId(created.id);
+      setActiveTab('alarm');
+    }
+    markFirstRunComplete();
+    setFirstAlarmRequired(false);
+    setShowTour(false);
   };
 
   const handleUpdateAlarm = (updatedAlarm: Alarm) => {
@@ -238,15 +283,13 @@ export default function App() {
     void nativeAlarmScheduler.stopRing();
   };
 
-  // Automatic Launch on Open: render onboarding tour first before dashboard.
+  // First launch (and any re-run from Settings): the wizard comes before the dashboard.
   // A ringing alarm always wins: the phone may have been opened by its notification.
   if (showTour && !ringingAlarm) {
     return (
       <OnboardingTour
-        onComplete={(newAlarm) => {
-          if (newAlarm) handleAddAlarm(newAlarm);
-          setShowTour(false);
-        }}
+        mandatory={firstAlarmRequired}
+        onComplete={handleTourComplete}
         onClose={() => setShowTour(false)}
       />
     );
@@ -282,6 +325,7 @@ export default function App() {
                 onDeleteAlarm={handleDeleteAlarm}
                 nextAlarmTime={getNextAlarmTime()}
                 language={language}
+                highlightAlarmId={highlightAlarmId}
               />
             </motion.div>
           )}
@@ -327,7 +371,10 @@ export default function App() {
                 language={language}
                 setLanguage={setLanguage}
                 onLaunchNightstand={() => setIsNightstandMode(true)}
-                onRelaunchTour={() => setShowTour(true)}
+                onRelaunchTour={() => {
+                  setFirstAlarmRequired(false); // a voluntary re-run is always closable
+                  setShowTour(true);
+                }}
               />
             </motion.div>
           )}

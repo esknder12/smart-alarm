@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption } from '../types';
 import { Language, translations } from '../utils/translations';
-import { Plus, Trash2, Bell, Edit2, Calendar, Zap, X } from 'lucide-react';
+import { Plus, Trash2, Bell, Edit2, Calendar, Zap, X, Check } from 'lucide-react';
 import { RingtonePickerModal } from './RingtonePickerModal';
 import { QuickAlarmModal } from './QuickAlarmModal';
 import AlarmEditorModal from './AlarmEditorModal';
@@ -17,6 +17,8 @@ interface AlarmClockProps {
   onDeleteAlarm: (id: string) => void;
   nextAlarmTime: string | null;
   language?: Language;
+  /** Id of a newly created alarm: its card is rung for a few seconds so the user sees it landed. */
+  highlightAlarmId?: string | null;
 }
 
 export const WALLPAPERS: WallpaperOption[] = [
@@ -34,7 +36,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   onDeleteAlarm,
   nextAlarmTime,
   language = 'en',
-}) => {
+  highlightAlarmId = null,
+}: AlarmClockProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
 
@@ -204,6 +207,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
       <div className="space-y-4 pb-20">
         {alarms.map((alarm) => {
           const isEnabled = alarm.enabled;
+          const isNew = highlightAlarmId === alarm.id;
           // Format time to 12h am/pm format like 7:00 am
           const [hStr, mStr] = alarm.time.split(':');
           let h = parseInt(hStr, 10);
@@ -220,7 +224,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 isEnabled
                   ? 'bg-[#1f2026] border-slate-700/80 shadow-2xl ring-1 ring-white/5'
                   : 'bg-[#141518]/60 border-slate-800/40 opacity-40'
-              }`}
+              } ${isNew ? 'ring-2 ring-emerald-400/70 shadow-emerald-500/20' : ''}`}
             >
               {/* Days indicator row S M T W T F S */}
               <div className="flex items-center space-x-2 text-xs font-black text-slate-500 mb-3 tracking-widest">
@@ -235,6 +239,15 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                     </span>
                   );
                 })}
+                {isNew && (
+                  <span
+                    id={`alarm-just-set-${alarm.id}`}
+                    className="ml-auto flex items-center space-x-1 text-[10px] font-black uppercase tracking-wider text-emerald-300"
+                  >
+                    <Check className="w-3 h-3 stroke-[3]" />
+                    <span>Set</span>
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
