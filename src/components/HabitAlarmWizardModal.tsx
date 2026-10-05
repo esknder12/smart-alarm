@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { SoundType, ChallengeType, WallpaperId, RINGTONES_CATALOG } from '../types';
 import { X, Flame, Plus, Check, Music, Bell, Shield, ArrowRight } from 'lucide-react';
 import { WALLPAPERS } from './AlarmClock';
+import { Language } from '../utils/translations';
 
 interface HabitAlarmWizardModalProps {
   isOpen: boolean;
@@ -14,9 +15,10 @@ interface HabitAlarmWizardModalProps {
     sound: SoundType,
     challenge: ChallengeType
   ) => void;
+  language?: Language;
 }
 
-const PRESET_HABITS = [
+const PRESET_HABITS_EN = [
   { emoji: '🐣', label: 'Wake up early' },
   { emoji: '💊', label: 'Take medication' },
   { emoji: '🏋️', label: '5-min stretch' },
@@ -25,13 +27,25 @@ const PRESET_HABITS = [
   { emoji: '🧘', label: '1-min meditation' },
 ];
 
+const PRESET_HABITS_AM = [
+  { emoji: '🐣', label: 'ማለዳ መነሳት' },
+  { emoji: '💊', label: 'መድኃኒት መውሰድ' },
+  { emoji: '🏋️', label: 'የ5 ደቂቃ ማፍታታት' },
+  { emoji: '💧', label: 'ውሃ መጠጣት' },
+  { emoji: '🤲', label: 'ፀሎት ማድረግ' },
+  { emoji: '🧘', label: 'የ1 ደቂቃ ማሰላሰል' },
+];
+
 export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
   isOpen,
   onClose,
   onSaveHabitAlarm,
+  language = 'en',
 }) => {
+  const isAm = language === 'am';
+  const presetHabits = isAm ? PRESET_HABITS_AM : PRESET_HABITS_EN;
   const [step, setStep] = useState<1 | 2>(1);
-  const [selectedHabit, setSelectedHabit] = useState<string>('Wake up early');
+  const [selectedHabit, setSelectedHabit] = useState<string>(isAm ? 'ማለዳ መነሳት' : 'Wake up early');
   const [customHabit, setCustomHabit] = useState<string>('');
   const [isCustomInput, setIsCustomInput] = useState<boolean>(false);
 
@@ -121,13 +135,13 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                   onClick={() => setStep(2)}
                   className="text-xs font-bold text-slate-400 hover:text-white"
                 >
-                  Skip
+                  {isAm ? 'ዝለል' : 'Skip'}
                 </button>
               </div>
             )}
 
             {step === 2 && (
-              <h3 className="text-base font-bold text-slate-200">Habit alarm</h3>
+              <h3 className="text-base font-bold text-slate-200">{isAm ? 'የልማድ ማንቂያ' : 'Habit alarm'}</h3>
             )}
           </div>
 
@@ -136,12 +150,12 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
             <div className="space-y-4">
               <div className="text-center py-2">
                 <h2 className="text-2xl font-black tracking-tight text-white">
-                  What habit do you want to build?
+                  {isAm ? 'ምን ዓይነት ልማድ መገንባት ይፈልጋሉ?' : 'What habit do you want to build?'}
                 </h2>
               </div>
 
               <div className="space-y-2.5">
-                {PRESET_HABITS.map((item) => (
+                {presetHabits.map((item) => (
                   <button
                     key={item.label}
                     type="button"
@@ -165,14 +179,14 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                     <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
                       <Plus className="w-4 h-4 text-white" />
                     </div>
-                    <span>Enter my own</span>
+                    <span>{isAm ? 'የራስዎን ያስገቡ' : 'Enter my own'}</span>
                   </button>
                 ) : (
                   <form onSubmit={handleCustomSubmit} className="flex space-x-2 pt-1">
                     <input
                       type="text"
                       autoFocus
-                      placeholder="e.g. Read 10 pages daily"
+                      placeholder={isAm ? 'ለምሳሌ፡ በየቀኑ 10 ገጽ ማንበብ' : 'e.g. Read 10 pages daily'}
                       value={customHabit}
                       onChange={(e) => setCustomHabit(e.target.value)}
                       className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500"
@@ -200,14 +214,14 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                   value={selectedHabit}
                   onChange={(e) => setSelectedHabit(e.target.value)}
                   className="bg-transparent text-sm font-bold text-white focus:outline-none flex-1 placeholder-slate-500"
-                  placeholder="Enter your habit goal"
+                  placeholder={isAm ? 'የልማድ ዓላማዎን ያስገቡ' : 'Enter your habit goal'}
                 />
               </div>
 
               {/* Time Selection */}
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Alarm time
+                  {isAm ? 'የማንቂያ ሰዓት' : 'Alarm time'}
                 </label>
                 <div className="bg-[#191b20] border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
                   <input
@@ -221,7 +235,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                     className="text-xs font-bold text-white hover:text-slate-200 flex items-center space-x-1 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700"
                   >
                     <Plus className="w-3.5 h-3.5 text-white" />
-                    <span>Add time</span>
+                    <span>{isAm ? 'ሰዓት ጨምር' : 'Add time'}</span>
                   </button>
                 </div>
               </div>
@@ -229,7 +243,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
               {/* Repeat Days Row */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-                  <span>Daily</span>
+                  <span>{isAm ? 'በየቀኑ' : 'Daily'}</span>
                   <label className="flex items-center space-x-2 cursor-pointer text-slate-200">
                     <input
                       type="checkbox"
@@ -237,12 +251,12 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                       onChange={(e) => toggleDaily(e.target.checked)}
                       className="w-4 h-4 rounded accent-cyan-500"
                     />
-                    <span>Daily</span>
+                    <span>{isAm ? 'በየቀኑ' : 'Daily'}</span>
                   </label>
                 </div>
 
                 <div className="flex justify-between space-x-1">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => {
+                  {(isAm ? ['እ', 'ሰ', 'ማ', 'ረ', 'ሐ', 'ዓ', 'ቅ'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, idx) => {
                     const selected = repeatDays.includes(idx);
                     return (
                       <button
@@ -265,14 +279,14 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
               {/* Wake-up Mission Selection */}
               <div className="bg-[#191b20] border border-slate-800 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-200">Wake-up mission</span>
+                  <span className="font-bold text-slate-200">{isAm ? 'የመነቂያ ፈተና' : 'Wake-up mission'}</span>
                   <span className="text-slate-500 font-mono">1/5</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'math', label: 'Math', icon: '+ -' },
-                    { id: 'shake', label: 'Shake', icon: '📱' },
-                    { id: 'memory', label: 'Memory', icon: '🧠' },
+                    { id: 'math', label: isAm ? 'ሂሳብ' : 'Math', icon: '+ -' },
+                    { id: 'shake', label: isAm ? 'አናውጥ' : 'Shake', icon: '📱' },
+                    { id: 'memory', label: isAm ? 'ትውስታ' : 'Memory', icon: '🧠' },
                   ].map((m) => {
                     const active = challenge === m.id;
                     return (
@@ -297,7 +311,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
               {/* Sound & Power-off Row */}
               <div className="bg-[#191b20] border border-slate-800 rounded-2xl p-3.5 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Alarm sound</span>
+                  <span className="text-slate-400 font-medium">{isAm ? 'የማንቂያ ድምፅ' : 'Alarm sound'}</span>
                   <select
                     value={sound}
                     onChange={(e) => setSound(e.target.value as SoundType)}
@@ -312,7 +326,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-                  <span className="text-slate-400 font-medium">Prevent power-off</span>
+                  <span className="text-slate-400 font-medium">{isAm ? 'ስልክ ማጥፋትን መከልከል' : 'Prevent power-off'}</span>
                   <button
                     type="button"
                     onClick={() => setPreventPowerOff(!preventPowerOff)}
@@ -322,7 +336,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                         : 'text-slate-500 bg-slate-900'
                     }`}
                   >
-                    {preventPowerOff ? 'On >' : 'Off >'}
+                    {preventPowerOff ? (isAm ? 'በርቷል >' : 'On >') : (isAm ? 'ጠፍቷል >' : 'Off >')}
                   </button>
                 </div>
               </div>
@@ -334,7 +348,7 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                 className="w-full bg-[#ff3b5c] hover:bg-[#e02f4d] text-white font-black text-base py-3.5 rounded-2xl shadow-lg shadow-red-500/20 transition flex items-center justify-center space-x-2"
               >
                 <Check className="w-5 h-5 stroke-[3]" />
-                <span>Save Habit Alarm</span>
+                <span>{isAm ? 'ልማድ ማንቂያውን አስቀምጥ' : 'Save Habit Alarm'}</span>
               </button>
             </div>
           )}

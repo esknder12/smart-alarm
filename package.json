@@ -13,7 +13,7 @@
     "android:debug": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
     "android:open": "cap open android",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/volumeLock.test.ts && tsx tests/alarmScheduler.test.ts && tsx tests/alarmText.test.ts && tsx tests/alarmEditor.test.ts && tsx tests/firstRun.test.ts && tsx tests/onboardingTour.test.ts",
+    "test": "tsx tests/volumeLock.test.ts && tsx tests/alarmScheduler.test.ts && tsx tests/alarmText.test.ts && tsx tests/alarmEditor.test.ts && tsx tests/firstRun.test.ts && tsx tests/onboardingTour.test.ts && tsx tests/defaultLanguage.test.ts",
     "test:lock": "tsx tests/volumeLock.test.ts",
     "test:schedule": "tsx tests/alarmScheduler.test.ts",
     "test:text": "tsx tests/alarmText.test.ts",

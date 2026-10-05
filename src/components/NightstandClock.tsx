@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Moon, AlarmClock, X, Sparkles, CloudSun } from 'lucide-react';
+import { Language } from '../utils/translations';
 
 interface NightstandClockProps {
   onClose: () => void;
   nextAlarmTime: string | null;
+  language?: Language;
 }
 
-const QUOTES = [
+const QUOTES_EN = [
+  "Every morning is a new chance to build your future.",
+  "Rise up, start fresh, and see the bright opportunity in each day.",
+  "The secret of getting ahead is getting started.",
+  "Mornings are full of hope and inspiration."
+];
+
+const QUOTES_AM = [
   "እያንዳንዱ ጠዋት የወደፊቱን ለመገንባት አዲስ እድል ነው።",
   "ተነሱ፣ በአዲስ መንፈስ ጀምሩ፣ የእያንዳንዱን ቀን ብሩህ እድል ተመልከቱ።",
   "ወደፊት የመራመድ ሚስጥር መጀመር ነው።",
@@ -16,10 +25,13 @@ const QUOTES = [
 export const NightstandClock: React.FC<NightstandClockProps> = ({
   onClose,
   nextAlarmTime,
+  language = 'en',
 }) => {
   const [time, setTime] = useState<Date>(new Date());
   const [isDimmed, setIsDimmed] = useState<boolean>(false);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
+  const isAm = language === 'am';
+  const quotes = isAm ? QUOTES_AM : QUOTES_EN;
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -28,13 +40,13 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
 
   useEffect(() => {
     const qTimer = setInterval(() => {
-      setQuoteIndex((prev) => (prev + 1) % QUOTES.length);
+      setQuoteIndex((prev) => (prev + 1) % quotes.length);
     }, 10000);
     return () => clearInterval(qTimer);
-  }, []);
+  }, [quotes.length]);
 
   const hours = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const dateStr = time.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const dateStr = time.toLocaleDateString(isAm ? 'am-ET' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
     <div
@@ -55,7 +67,7 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
           {nextAlarmTime && (
             <div className="flex items-center space-x-2 text-slate-200 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-xs font-semibold">
               <AlarmClock className="w-4 h-4 text-white" />
-              <span>ማንቂያ: {nextAlarmTime}</span>
+              <span>{isAm ? 'ማንቂያ:' : 'Alarm:'} {nextAlarmTime}</span>
             </div>
           )}
         </div>
@@ -70,7 +82,7 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
             }`}
           >
             <Moon className="w-4 h-4" />
-            <span>{isDimmed ? 'የምሽት ማብራሪያ በርቷል' : 'ማብራሪያውን ቀንስ'}</span>
+            <span>{isDimmed ? (isAm ? 'የምሽት ማብራሪያ በርቷል' : 'Night Dim On') : (isAm ? 'ማብራሪያውን ቀንስ' : 'Dim Display')}</span>
           </button>
 
           <button
@@ -97,13 +109,13 @@ export const NightstandClock: React.FC<NightstandClockProps> = ({
         {/* Motivational Ticker */}
         <div className="mt-8 max-w-lg mx-auto text-sm sm:text-base font-medium italic text-slate-400 flex items-center justify-center space-x-2">
           <Sparkles className="w-4 h-4 text-white shrink-0" />
-          <span>"{QUOTES[quoteIndex]}"</span>
+          <span>"{quotes[quoteIndex % quotes.length]}"</span>
         </div>
       </div>
 
       {/* Footer Info */}
       <div className="text-center text-xs text-slate-600">
-        Nightstand Bedside Clock • Click top right X to exit
+        {isAm ? 'የአልጋ አጠገብ ሰዓት • ለመውጣት ከላይ በቀኝ በኩል ያለውን X ይጫኑ' : 'Nightstand Bedside Clock • Click top right X to exit'}
       </div>
     </div>
   );

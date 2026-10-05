@@ -376,7 +376,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 className="bg-white text-slate-900 font-bold text-sm py-3 px-5 rounded-2xl shadow-2xl flex items-center space-x-3 transition hover:bg-slate-50 active:scale-95"
               >
                 <Calendar className="w-5 h-5 text-slate-900 fill-slate-300" />
-                <span>Habit alarm</span>
+                <span>{language === 'am' ? 'ልማድ ማንቂያ' : 'Habit alarm'}</span>
               </motion.button>
 
               {/* Quick alarm pill */}
@@ -393,7 +393,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 className="bg-white text-slate-900 font-bold text-sm py-3 px-5 rounded-2xl shadow-2xl flex items-center space-x-3 transition hover:bg-slate-50 active:scale-95"
               >
                 <Zap className="w-5 h-5 text-slate-900 fill-slate-300" />
-                <span>Quick alarm</span>
+                <span>{language === 'am' ? 'ፈጣን ማንቂያ' : 'Quick alarm'}</span>
               </motion.button>
 
               {/* Alarm pill */}
@@ -410,7 +410,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 className="bg-white text-slate-900 font-bold text-sm py-3.5 px-6 rounded-2xl shadow-2xl flex items-center space-x-3 transition hover:bg-slate-50 active:scale-95 border-2 border-slate-200"
               >
                 <Bell className="w-5 h-5 text-slate-900 fill-slate-300" />
-                <span>Alarm</span>
+                <span>{language === 'am' ? 'ማንቂያ' : 'Alarm'}</span>
               </motion.button>
             </div>
           )}
@@ -453,6 +453,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         isOpen={isHabitWizardOpen}
         onClose={() => setIsHabitWizardOpen(false)}
         onSaveHabitAlarm={handleSaveHabitAlarm}
+        language={language}
       />
     </div>
   );
