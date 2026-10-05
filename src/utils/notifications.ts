@@ -40,8 +40,10 @@ export const sendAlarmNotification = (title: string, time: string): boolean => {
     try {
       const options: NotificationOptions = {
         body: `⏰ It's ${time}! Time to wake up: ${title}`,
-        icon: 'https://images.unsplash.com/photo-1508962914676-134849a727f0?w=128&auto=format&fit=crop&q=80',
-        badge: 'https://images.unsplash.com/photo-1508962914676-134849a727f0?w=128&auto=format&fit=crop&q=80',
+        // Relative to the document, so the icon also resolves when the app is
+        // served from a sub-path (and from the WebView's file:// bundle).
+        icon: './app-icon-192.png',
+        badge: './app-icon-192.png',
         tag: 'wakeup-alarm-' + Date.now(),
         requireInteraction: true,
       };

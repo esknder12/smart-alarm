@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 100 1018 488" width="1018" height="488" role="img" aria-label="Niqu">
+  <title>Niqu</title>
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#F6E1B0"/>
+      <stop offset="28%" stop-color="#E0BF74"/>
+      <stop offset="62%" stop-color="#B98F3C"/>
+      <stop offset="100%" stop-color="#7E5A20"/>
+    </linearGradient>
+    <linearGradient id="brassLight" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#FDF3D8"/>
+      <stop offset="40%" stop-color="#EBCB8A"/>
+      <stop offset="100%" stop-color="#A97F33"/>
+    </linearGradient>
+  </defs>
+
+  <!-- letters: N I U (light, for dark backgrounds) -->
+  <g fill="#E9EDF3">
+    <path d="M40,520 L40,250 L90,250 L186,452 L186,250 L236,250 L236,520 L186,520 L90,318 L90,520 Z"/>
+    <path d="M288,250 L352,250 L352,520 L288,520 Z"/>
+    <path d="M830,250 L880,250 L880,420 A50,50 0 0 0 980,420 L980,250 L1030,250 L1030,420 A100,100 0 0 1 830,420 Z"/>
+  </g>
+
+  <!-- sound waves -->
+  <g stroke="#EC3A33" stroke-width="17" stroke-linecap="round" fill="none">
+    <path d="M478,327 A127,127 0 0 0 478,443"/>
+    <path d="M440,306 A230,230 0 0 0 440,464"/>
+    <path d="M762,327 A127,127 0 0 1 762,443"/>
+    <path d="M800,306 A230,230 0 0 1 800,464"/>
+  </g>
+
+  <!-- Q ring -->
+  <circle cx="620" cy="385" r="112" fill="none" stroke="#EC3A33" stroke-width="46"/>
+  <!-- Q tail -->
+  <path d="M676,452 L742,552" stroke="#EC3A33" stroke-width="44" stroke-linecap="round" fill="none"/>
+
+  <!-- alarm clock: handle -->
+  <path d="M552,166 C562,108 678,108 688,166" fill="none" stroke="url(#brassLight)" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- alarm clock: bells -->
+  <g>
+    <g transform="translate(542,224) rotate(-18)">
+      <path d="M-65,0 A65,58 0 0 1 65,0 Z" fill="url(#brass)" stroke="#8A6A2A" stroke-width="4"/>
+      <rect x="-70" y="-2" width="140" height="14" rx="7" fill="url(#brassLight)" stroke="#8A6A2A" stroke-width="4"/>
+      <circle cx="0" cy="-56" r="6.5" fill="url(#brassLight)" stroke="#8A6A2A" stroke-width="3"/>
+    </g>
+    <g transform="translate(698,224) rotate(18)">
+      <path d="M-65,0 A65,58 0 0 1 65,0 Z" fill="url(#brass)" stroke="#8A6A2A" stroke-width="4"/>
+      <rect x="-70" y="-2" width="140" height="14" rx="7" fill="url(#brassLight)" stroke="#8A6A2A" stroke-width="4"/>
+      <circle cx="0" cy="-56" r="6.5" fill="url(#brassLight)" stroke="#8A6A2A" stroke-width="3"/>
+    </g>
+  </g>
+
+  <!-- alarm clock: centre striker -->
+  <g>
+    <circle cx="620" cy="196" r="11" fill="url(#brassLight)" stroke="#8A6A2A" stroke-width="3.5"/>
+    <rect x="612" y="192" width="16" height="74" rx="7" fill="url(#brass)" stroke="#8A6A2A" stroke-width="3"/>
+  </g>
+</svg>

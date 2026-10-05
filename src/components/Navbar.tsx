@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TabType } from '../types';
-import { AlarmClock, Sun, Moon, Settings, FileText, Sparkles, ChevronRight, Globe } from 'lucide-react';
+import { AlarmClock, Sun, Moon, Settings, FileText, ChevronRight, Globe } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
-import { APP_NAME } from '../constants';
+import { AppLogo } from './AppLogo';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -48,12 +48,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Top Header Status Bar */}
       <header id="app-header" className="bg-[#121316] border-b border-slate-800/80 text-slate-100 sticky top-0 z-30 px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          {/* Top Left: App Brand Badge */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 text-white border border-slate-700 font-black text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-              <span>{APP_NAME}</span>
-            </div>
+          {/* Top Left: App Brand Logo */}
+          <div className="flex items-center">
+            <AppLogo className="h-7 w-auto shrink-0" variant="light" />
           </div>
 
           {/* Top Right: Language Switcher, Clock & Nightstand mode toggle */}
