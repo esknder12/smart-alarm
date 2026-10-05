@@ -47,7 +47,8 @@ export default function App() {
       hasOwnAlarm: hasUserSetOwnAlarm(loadAlarms()),
     })
   );
-  const [showTour, setShowTour] = useState<boolean>(firstAlarmRequired);
+  // First-run setup stays inside the alarm dashboard; the editor is opened from that screen.
+  const [showTour, setShowTour] = useState<boolean>(false);
   // Briefly rings the card of the alarm the wizard just created, so the user sees it landed.
   const [highlightAlarmId, setHighlightAlarmId] = useState<string | null>(null);
 
@@ -176,8 +177,32 @@ export default function App() {
     snoozeCount: 0,
   });
 
+  const requestAlarmPresentationPermissions = async () => {
+    if (!nativeAlarmScheduler.isAvailable()) return;
+    let state = await nativeAlarmScheduler.getState();
+    if (!state.notificationsAllowed) {
+      await nativeAlarmScheduler.requestNotificationPermission();
+      state = await nativeAlarmScheduler.getState();
+    }
+    // Android 14+ requires a user-enabled full-screen notification for the puzzle to
+    // automatically appear when the alarm rings while the app is backgrounded.
+    if (!state.fullScreenIntentAllowed) {
+      await nativeAlarmScheduler.openSettings('fullScreenIntent');
+    }
+  };
+
   const handleAddAlarm = (newAlarmData: Omit<Alarm, 'id' | 'snoozeCount'>) => {
-    setAlarms([...alarms, buildAlarm(newAlarmData)]);
+    const needsAlarmPermissions = firstAlarmRequired;
+    const created = buildAlarm(newAlarmData);
+    setAlarms(needsAlarmPermissions ? [created] : [...alarms, created]);
+    if (needsAlarmPermissions) {
+      setHighlightAlarmId(created.id);
+      markFirstRunComplete();
+      setFirstAlarmRequired(false);
+    }
+    // Check whenever an alarm is created. This only opens a system permission flow when the
+    // required notification/full-screen access is missing, including for existing installations.
+    void requestAlarmPresentationPermissions();
   };
 
   /**
@@ -283,12 +308,10 @@ export default function App() {
     void nativeAlarmScheduler.stopRing();
   };
 
-  // First launch (and any re-run from Settings): the wizard comes before the dashboard.
-  // A ringing alarm always wins: the phone may have been opened by its notification.
   if (showTour && !ringingAlarm) {
     return (
       <OnboardingTour
-        mandatory={firstAlarmRequired}
+        mandatory={false}
         onComplete={handleTourComplete}
         onClose={() => setShowTour(false)}
       />
@@ -326,6 +349,7 @@ export default function App() {
                 nextAlarmTime={getNextAlarmTime()}
                 language={language}
                 highlightAlarmId={highlightAlarmId}
+                openEditorOnMount={firstAlarmRequired}
               />
             </motion.div>
           )}

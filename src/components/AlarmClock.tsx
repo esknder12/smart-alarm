@@ -19,6 +19,8 @@ interface AlarmClockProps {
   language?: Language;
   /** Id of a newly created alarm: its card is rung for a few seconds so the user sees it landed. */
   highlightAlarmId?: string | null;
+  /** Open the standard alarm editor on first launch, without leaving the dashboard. */
+  openEditorOnMount?: boolean;
 }
 
 export const WALLPAPERS: WallpaperOption[] = [
@@ -37,8 +39,9 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   nextAlarmTime,
   language = 'en',
   highlightAlarmId = null,
+  openEditorOnMount = false,
 }: AlarmClockProps) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(openEditorOnMount);
   const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
 
   // Form State

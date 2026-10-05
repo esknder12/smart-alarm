@@ -169,24 +169,39 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
     void refreshPermissions();
   }, []);
 
-  const askForNotifications = async () => {
+  // One in-app permission screen and one action. Android may open its own system page for
+  // exact-alarm/full-screen access; after returning, the same button continues with the next item.
+  const requestNextRequiredPermission = async () => {
     setPermissionBusy(true);
-    await nativeAlarmScheduler.requestNotificationPermission();
-    await refreshPermissions();
-    setPermissionBusy(false);
-  };
-
-  const askForExactAlarms = async () => {
-    setPermissionBusy(true);
-    await nativeAlarmScheduler.openSettings('exactAlarm');
-    await refreshPermissions();
+    let state = await nativeAlarmScheduler.getState();
+    setPermissions(state);
+    if (!state.available) {
+      setPermissionBusy(false);
+      return;
+    }
+    if (!state.notificationsAllowed) {
+      await nativeAlarmScheduler.requestNotificationPermission();
+    } else if (!state.exactAlarmsAllowed) {
+      await nativeAlarmScheduler.openSettings('exactAlarm');
+    } else if (!state.fullScreenIntentAllowed) {
+      await nativeAlarmScheduler.openSettings('fullScreenIntent');
+    }
+    state = await nativeAlarmScheduler.getState();
+    setPermissions(state);
     setPermissionBusy(false);
   };
 
   const permissionsMissing =
     !!permissions &&
     permissions.available &&
-    (!permissions.notificationsAllowed || !permissions.exactAlarmsAllowed);
+    (!permissions.notificationsAllowed || !permissions.exactAlarmsAllowed || !permissions.fullScreenIntentAllowed);
+  const requiredPermissionsReady =
+    permissions !== null &&
+    (!permissions.available || (
+      permissions.notificationsAllowed &&
+      permissions.exactAlarmsAllowed &&
+      permissions.fullScreenIntentAllowed
+    ));
 
   // Theme state
   const [selectedTheme] = useState<WallpaperId>('nature');
@@ -565,31 +580,23 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
             {/* Android asks for these itself; a browser never shows this card */}
             {permissionsMissing && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
-                <div className="text-xs font-bold text-amber-300">
-                  One more thing - so this alarm really rings with the phone locked
+                <div className="text-sm font-black text-amber-300">
+                  Required for the alarm screen to open automatically
                 </div>
-                {permissions && !permissions.notificationsAllowed && (
-                  <button
-                    id="btn-onboarding-allow-notifications"
-                    type="button"
-                    disabled={permissionBusy}
-                    onClick={() => void askForNotifications()}
-                    className="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs transition active:scale-95 disabled:opacity-60"
-                  >
-                    Allow notifications
-                  </button>
-                )}
-                {permissions && !permissions.exactAlarmsAllowed && (
-                  <button
-                    id="btn-onboarding-allow-exact-alarms"
-                    type="button"
-                    disabled={permissionBusy}
-                    onClick={() => void askForExactAlarms()}
-                    className="w-full py-2.5 rounded-xl bg-slate-900 text-amber-300 border border-amber-500/40 font-bold text-xs transition active:scale-95 disabled:opacity-60"
-                  >
-                    Allow exact alarms
-                  </button>
-                )}
+                <div className="space-y-1 text-[11px] font-medium text-slate-300">
+                  <div>Notifications: {permissions?.notificationsAllowed ? 'Allowed' : 'Required'}</div>
+                  <div>Exact alarms: {permissions?.exactAlarmsAllowed ? 'Allowed' : 'Required'}</div>
+                  <div>Full-screen alarm: {permissions?.fullScreenIntentAllowed ? 'Allowed' : 'Required'}</div>
+                </div>
+                <button
+                  id="btn-onboarding-allow-required-permissions"
+                  type="button"
+                  disabled={permissionBusy}
+                  onClick={() => void requestNextRequiredPermission()}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs transition active:scale-95 disabled:opacity-60"
+                >
+                  {permissionBusy ? 'Checking…' : 'Grant required permissions'}
+                </button>
               </div>
             )}
           </div>
@@ -614,14 +621,15 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           id="btn-onboarding-next"
           type="button"
           onClick={handleNext}
+          disabled={step === 3 && mandatory && !requiredPermissionsReady}
           className={`${
             step > 0 ? 'w-2/3' : 'w-full'
-          } bg-red-500 hover:bg-red-400 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-red-500/30 transition active:scale-95 flex items-center justify-center space-x-2`}
+          } bg-red-500 hover:bg-red-400 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-lg shadow-red-500/30 transition active:scale-95 flex items-center justify-center space-x-2 disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <span>
             {step === 3
               ? mandatory
-                ? 'Set my alarm'
+                ? requiredPermissionsReady ? 'Set my alarm' : 'Allow permissions first'
                 : 'Set alarm & close'
               : 'Next'}
           </span>

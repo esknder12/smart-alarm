@@ -138,89 +138,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </button>
 
-        {/* Row 3: Prevent power-off */}
-        <button
-          onClick={() => setPreventPowerOff(!preventPowerOff)}
-          className="w-full p-3.5 flex items-center justify-between hover:bg-slate-800/40 rounded-2xl transition"
-        >
-          <div className="flex items-center space-x-3.5">
-            <div className="w-5 h-5 text-emerald-400 flex items-center justify-center">
-              <Star className="w-5 h-5 fill-emerald-500/20" />
-            </div>
-            <span className="font-bold text-sm text-slate-100">
-              {isAm ? 'ስልክ እንዳይጠፋ ከልክል' : 'Prevent Power-off'}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
-            <span className="text-xs font-mono">
-              • {preventPowerOff ? (isAm ? 'በራ' : 'ON') : (isAm ? 'ጠፋ' : 'OFF')}
-            </span>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-        </button>
-
-        {/* Row 4: Prevent app uninstall */}
-        <div className="p-3.5 flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-5 h-5 text-red-400 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-sm text-slate-100">
-              {isAm ? 'መተግበሪያው እንዳይጠፋ ከልክል' : 'Prevent App Uninstall'}
-            </span>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preventUninstall}
-              onChange={(e) => setPreventUninstall(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500" />
-          </label>
-        </div>
-
-        {/* Row 5: Strict volume lock */}
-        <button
-          onClick={() => setActiveModal('volume_lock')}
-          className="w-full p-3.5 flex items-center justify-between hover:bg-slate-800/40 rounded-2xl transition"
-        >
-          <div className="flex items-center space-x-3.5">
-            <div className="w-5 h-5 text-amber-400 flex items-center justify-center">
-              <Lock className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-sm text-slate-100">
-              {isAm ? 'የድምፅ መቀነሻ ጠንካራ መቆለፊያ' : 'Strict Volume Lock'}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
-            <span className="text-xs font-mono text-emerald-400">
-              • {isAm ? 'ሁልጊዜ በራ' : 'ALWAYS ON'}
-            </span>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-        </button>
-
-        {/* Row 6: Wake-up reliability (exact alarms, notifications, full-screen intent) */}
-        <button
-          onClick={() => setActiveModal('reliability')}
-          className="w-full p-3.5 flex items-center justify-between hover:bg-slate-800/40 rounded-2xl transition"
-        >
-          <div className="flex items-center space-x-3.5">
-            <div className="w-5 h-5 text-cyan-400 flex items-center justify-center">
-              <BellRing className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-sm text-slate-100">
-              {isAm ? 'ማንቂያው በእርግጥ ይደውላል?' : 'Wake-Up Reliability'}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
-            <span className="text-xs font-mono">
-              • {nativeLock ? (isAm ? 'ከመተግበሪያው ውጭም' : 'CLOSED APP') : (isAm ? 'አሳሽ' : 'BROWSER')}
-            </span>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-        </button>
       </div>
 
       {/* Main Settings List Group 1 */}
@@ -245,9 +162,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
               {isAm ? 'ከፍተኛ የማንቂያ ማስተካከያዎች' : 'Advanced Alarm Settings'}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              {isAm ? 'የማንቂያ እና የተግባር ማስተካከያዎች' : 'Missions & Snooze parameters'}
-            </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
         </button>
@@ -259,7 +173,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              {isAm ? 'ጭብጥ (Theme)' : 'App Theme'}
+              {isAm ? 'ጭብጥ' : 'Theme'}
             </div>
             <div className="text-xs text-amber-400 mt-0.5 font-medium">
               {selectedTheme}
@@ -290,14 +204,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              {isAm ? 'የማስታወቂያ ማስተካከያ' : 'Notification Settings'}
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              {isAm ? 'የአገልግሎት ማስታወቂያ እና ዝመናዎች' : 'Service & Background notifications'}
+              {isAm ? 'ማሳወቂያዎች' : 'Notifications'}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
         </button>
+
+        {/* Essential Android permission to open the alarm challenge automatically. */}
+        {nativeLock && (
+          <button
+            onClick={() => setActiveModal('reliability')}
+            className="w-full p-4 bg-[#18191d] hover:bg-[#202127] border border-slate-800/80 rounded-2xl flex items-center justify-between transition text-left"
+          >
+            <span className="font-bold text-sm text-slate-100">{isAm ? 'የማንቂያ ፈቃዶች' : 'Alarm permissions'}</span>
+            <ChevronRight className="w-5 h-5 text-slate-500" />
+          </button>
+        )}
 
         {/* System configuration */}
         <button
@@ -306,10 +228,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div>
             <div className="font-bold text-sm text-slate-100 group-hover:text-white">
-              {isAm ? 'የስርዓት ውቅር' : 'System Configuration'}
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              {isAm ? 'የመተግበሪያ ቋንቋ (አማርኛ)' : 'App Language (English)'}
+              {isAm ? 'ቋንቋ' : 'Language'}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500" />
