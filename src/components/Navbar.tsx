@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TabType } from '../types';
-import { AlarmClock, Sun, Moon, Settings, FileText, ChevronRight, Globe } from 'lucide-react';
+import { AlarmClock, Sun, Moon, Settings, Globe } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
 import { AppLogo } from './AppLogo';
 
@@ -106,14 +106,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           })}
         </div>
 
-        {/* Bottom Simulated Ad Banner Strip */}
-        <div className="bg-[#0b0c0e] py-1 px-3 border-t border-slate-900 text-center flex items-center justify-center space-x-2 text-[10px] text-slate-500">
-          <span className="bg-slate-800 text-slate-400 px-1 rounded font-bold">AD</span>
-          <span>MEXC</span>
-          <span className="text-slate-400 font-semibold flex items-center">
-            INSTALL <ChevronRight className="w-3 h-3 ml-0.5 inline" />
-          </span>
-        </div>
       </div>
     </>
   );
