@@ -1,5 +1,8 @@
 package com.esknder.niqu;
 
+import android.app.KeyguardManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -58,6 +61,9 @@ public class MainActivity extends BridgeActivity {
     private final RingSession.Listener ringListener = () -> {
         // isEngaged() re-reads the session and reports the change to onAlarmLockChanged().
         alarmLock.isEngaged();
+        if (RingSession.shared().isRinging()) {
+            runOnUiThread(this::wakeUpAndUnlock);
+        }
     };
 
     @Override
@@ -72,11 +78,8 @@ public class MainActivity extends BridgeActivity {
         RingSession.shared().addListener(ringListener);
         alarmLock.setStateListener(this::onAlarmLockChanged);
 
-        // Show the puzzle (and block the keys) over the lock screen when the alarm's full-screen
-        // intent brings this activity up. The manifest attributes do this on API 27+; these calls
-        // cover Android 7.x, which the app still supports.
-        setShowWhenLockedCompat(true);
-        setTurnScreenOnCompat(true);
+        // Turn screen on and show puzzle over keyguard/lockscreen
+        wakeUpAndUnlock();
 
         // Back is only swallowed while the lock is engaged (the callback is disabled otherwise, so
         // Capacitor / the platform keep handling it exactly as before).
@@ -95,8 +98,17 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        wakeUpAndUnlock();
+        alarmLock.isEngaged();
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
+        wakeUpAndUnlock();
         // Covers the activity being re-created (or brought forward from the notification) while the
         // service is already ringing: the lock picks the session up without the page's help.
         alarmLock.isEngaged();
@@ -167,6 +179,28 @@ public class MainActivity extends BridgeActivity {
                 backGuard.setEnabled(engaged);
             }
         });
+    }
+
+    @SuppressWarnings("deprecation")
+    private void wakeUpAndUnlock() {
+        setShowWhenLockedCompat(true);
+        setTurnScreenOnCompat(true);
+
+        getWindow().addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+            | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        );
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+            KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            if (km != null) {
+                km.requestDismissKeyguard(this, null);
+            }
+        }
     }
 
     private void setShowWhenLockedCompat(boolean show) {

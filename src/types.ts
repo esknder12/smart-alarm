@@ -1,4 +1,4 @@
-export type TabType = 'alarm' | 'sleep' | 'morning' | 'settings';
+export type TabType = 'alarm' | 'settings';
 
 export interface PetState {
   name: string;
@@ -121,6 +121,8 @@ export interface Alarm {
   gentleWakeUp?: boolean; // Gradually increase volume
   wallpaper?: WallpaperId;
   snoozeCount: number;
+  snoozeInterval?: number; // e.g. 1, 3, 5, 10, 15, 20, 25, 30 min (default 5)
+  snoozeLimit?: number; // e.g. 1, 2, 3, 5, 10, 99=unlimited (default 3)
   challenge: ChallengeType;
   challengeDifficulty: 'easy' | 'medium' | 'hard';
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TabType, Alarm, RoutineStep, WakeLog, AmbientSound } from './types';
+import { TabType, Alarm } from './types';
 import { Language, translations } from './utils/translations';
 import { sendAlarmNotification } from './utils/notifications';
 import { APP_NAME } from './constants';
@@ -8,12 +8,6 @@ import {
   loadAlarms,
   saveAlarms,
   hasUserSetOwnAlarm,
-  loadRoutine,
-  saveRoutine,
-  loadLogs,
-  saveLogs,
-  loadAmbients,
-  saveAmbients,
 } from './utils/storage';
 import {
   nativeAlarmScheduler,
@@ -23,10 +17,6 @@ import {
 import { Navbar } from './components/Navbar';
 import { AlarmClock } from './components/AlarmClock';
 import { AlarmRingingModal } from './components/AlarmRingingModal';
-import { MorningRoutine } from './components/MorningRoutine';
-import { MorningTab } from './components/MorningTab';
-import { SleepCalculator } from './components/SleepCalculator';
-import { AmbientSoundscape } from './components/AmbientSoundscape';
 import { NightstandClock } from './components/NightstandClock';
 import { OnboardingTour } from './components/OnboardingTour';
 import {
@@ -81,9 +71,6 @@ export default function App() {
 
   // Core State
   const [alarms, setAlarms] = useState<Alarm[]>(loadAlarms);
-  const [routine, setRoutine] = useState<RoutineStep[]>(loadRoutine);
-  const [logs, setLogs] = useState<WakeLog[]>(loadLogs);
-  const [ambients, setAmbients] = useState<AmbientSound[]>(loadAmbients);
 
   // Active Ringing Alarm
   const [ringingAlarm, setRingingAlarm] = useState<Alarm | null>(null);
@@ -91,9 +78,6 @@ export default function App() {
 
   // Persist State Updates
   useEffect(() => saveAlarms(alarms), [alarms]);
-  useEffect(() => saveRoutine(routine), [routine]);
-  useEffect(() => saveLogs(logs), [logs]);
-  useEffect(() => saveAmbients(ambients), [ambients]);
 
   // --- Native alarm engine (Android app only) -------------------------------
   // The JS timer below only ticks while this page is alive. On a phone the alarms are mirrored
@@ -246,55 +230,6 @@ export default function App() {
     setAlarms(alarms.filter((a) => a.id !== id));
   };
 
-  const handleSetQuickAlarm = (time: string, label: string) => {
-    const existing = alarms.find((a) => a.time === time);
-    if (existing) {
-      setAlarms(alarms.map((a) => (a.id === existing.id ? { ...a, enabled: true, label } : a)));
-    } else {
-      handleAddAlarm({
-        time,
-        label,
-        enabled: true,
-        repeatDays: [0, 1, 2, 3, 4, 5, 6],
-        sound: 'sunrise',
-        volume: 80,
-        challenge: 'math',
-        challengeDifficulty: 'easy',
-      });
-    }
-  };
-
-  // Handlers for Routine
-  const handleToggleStep = (id: string) => {
-    setRoutine(routine.map((r) => (r.id === id ? { ...r, completed: !r.completed } : r)));
-  };
-
-  const handleAddStep = (stepData: Omit<RoutineStep, 'id' | 'completed'>) => {
-    const newStep: RoutineStep = {
-      ...stepData,
-      id: Date.now().toString(),
-      completed: false,
-    };
-    setRoutine([...routine, newStep]);
-  };
-
-  const handleDeleteStep = (id: string) => {
-    setRoutine(routine.filter((r) => r.id !== id));
-  };
-
-  const handleResetRoutine = () => {
-    setRoutine(routine.map((r) => ({ ...r, completed: false })));
-  };
-
-  // Handlers for Logs
-  const handleAddLog = (logData: Omit<WakeLog, 'id'>) => {
-    const newLog: WakeLog = {
-      ...logData,
-      id: Date.now().toString(),
-    };
-    setLogs([newLog, ...logs]);
-  };
-
   // Snooze Alarm
   const handleSnooze = (minutes: number) => {
     if (!ringingAlarm) return;
@@ -366,35 +301,6 @@ export default function App() {
                 onEditorVisibilityChange={setIsAlarmEditorVisible}
               />
             </div>
-          )}
-
-          {activeTab === 'sleep' && (
-            <motion.div
-              key="sleep"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              <SleepCalculator onSetAlarm={handleSetQuickAlarm} language={language} />
-            </motion.div>
-          )}
-
-          {(activeTab === 'morning' || activeTab === 'routine') && (
-            <motion.div
-              key="morning"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              <MorningTab
-                routine={routine}
-                onToggleStep={handleToggleStep}
-                onSelectTab={setActiveTab}
-                language={language}
-              />
-            </motion.div>
           )}
 
           {activeTab === 'settings' && (

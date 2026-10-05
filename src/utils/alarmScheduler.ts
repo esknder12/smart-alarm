@@ -94,7 +94,7 @@ export interface AlarmSchedulerBackend {
   getState(): Promise<Partial<AlarmScheduleState>>;
   takeOverRing(): Promise<Partial<AlarmScheduleState>>;
   stopRing(): Promise<Partial<AlarmScheduleState>>;
-  openSettings(options: { target: 'exactAlarm' | 'fullScreenIntent' }): Promise<void>;
+  openSettings(options: { target: 'exactAlarm' | 'fullScreenIntent' | 'overlay' }): Promise<void>;
   requestPermissions(options?: { permissions?: string[] }): Promise<Record<string, string> | void>;
   addListener(eventName: 'alarmTriggered', listener: (event: RingingAlarmInfo) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'ringStopped', listener: (event: unknown) => void): Promise<PluginListenerHandle>;
