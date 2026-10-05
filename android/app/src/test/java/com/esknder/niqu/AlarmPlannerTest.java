@@ -81,9 +81,27 @@ public class AlarmPlannerTest {
     // ------------------------------------------------------------------------ repeat patterns
 
     @Test
+    public void weekdayIndicesMatchTheWebAppsConvention() {
+        // The single most dangerous thing in this file: the web app stores repeatDays as
+        // 0 = Sunday … 6 = Saturday, while Calendar.DAY_OF_WEEK is 1 = Sunday … 7 = Saturday.
+        // This walks all seven indices and checks the day that actually fires.
+        String[] expectedDayNames = { "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY" };
+        long saturdayEvening = at(2026, 5, 9, 20, 0, ADDIS_ZONE);
+
+        for (int index = 0; index < 7; index++) {
+            AlarmSchedule onlyThatDay = onDays("d" + index, 12, 0, Collections.singletonList(index));
+            long trigger = AlarmPlanner.nextTrigger(onlyThatDay, saturdayEvening, ADDIS);
+            java.time.DayOfWeek fired = ZonedDateTime
+                .ofInstant(java.time.Instant.ofEpochMilli(trigger), ADDIS_ZONE)
+                .getDayOfWeek();
+            assertEquals("repeatDays " + index, expectedDayNames[index], fired.name());
+        }
+    }
+
+    @Test
     public void weeklyAlarmSkipsDaysThatAreNotSelected() {
-        // Monday, Wednesday, Friday (Calendar: 2, 4, 6).
-        AlarmSchedule monWedFri = onDays("work", 6, 30, Arrays.asList(2, 4, 6));
+        // Monday, Wednesday, Friday. The web app stores 0 = Sunday, so these are 1, 3 and 5.
+        AlarmSchedule monWedFri = onDays("work", 6, 30, Arrays.asList(1, 3, 5));
         long mondayLunchtime = at(2026, 5, 4, 12, 0, ADDIS_ZONE);
 
         long trigger = AlarmPlanner.nextTrigger(monWedFri, mondayLunchtime, ADDIS);
@@ -93,7 +111,7 @@ public class AlarmPlannerTest {
 
     @Test
     public void weeklyAlarmKeepsTheSameDayWhenTheTimeIsStillAhead() {
-        AlarmSchedule monWedFri = onDays("work", 18, 0, Arrays.asList(2, 4, 6));
+        AlarmSchedule monWedFri = onDays("work", 18, 0, Arrays.asList(1, 3, 5));
         long mondayMorning = at(2026, 5, 4, 9, 0, ADDIS_ZONE);
 
         long trigger = AlarmPlanner.nextTrigger(monWedFri, mondayMorning, ADDIS);
@@ -178,7 +196,7 @@ public class AlarmPlannerTest {
 
     @Test
     public void everyDayOfTheWeekIsReachableWithinAWeek() {
-        AlarmSchedule alarm = onDays("any", 6, 30, Collections.singletonList(3)); // Thursday
+        AlarmSchedule alarm = onDays("any", 6, 30, Collections.singletonList(4)); // 4 = Thursday
         long start = at(2026, 5, 4, 0, 0, ADDIS_ZONE); // Monday
 
         long trigger = AlarmPlanner.nextTrigger(alarm, start, ADDIS);
