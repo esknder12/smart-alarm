@@ -1,4 +1,5 @@
 import { audioEngine } from './audio';
+import { nativeAlarmLock, type HardwareKey } from './alarmLock';
 
 /**
  * Strict Volume Lock Guard
@@ -22,15 +23,34 @@ import { audioEngine } from './audio';
  *  6. Multi-channel wake-up: screen wake lock + repeating haptic vibration so
  *     the user is woken even if the speaker is muted.
  *  7. The tab cannot be closed/reloaded by accident while the alarm rings.
+ *  8. Android app only: the NATIVE hardware-key lock (see below).
  *
- * IMPORTANT / HONEST LIMITATION
- * Mobile operating systems route the physical volume rocker straight to the
- * system mixer; a web page never receives that event and cannot block it (only
- * a native app with AudioManager / AVAudioSession control can). This guard
- * therefore locks everything the browser exposes, and escalates loudness and
- * haptics to defeat a manual volume-down even when the hardware event is
- * invisible to JavaScript.
+ * HARDWARE BUTTONS
+ * The phone's physical volume rocker never reaches a web page: Android's WebView
+ * hands it straight to the system mixer, so no JavaScript can block it. In the
+ * Android app that job is done natively - while this guard is engaged it keeps
+ * a short native lease alive (alarmLock.ts -> AlarmLockPlugin.java), and for as
+ * long as the lease lives MainActivity swallows volume-down / volume-up / mute
+ * and Back before the system sees them. The lease is renewed from tick(); if
+ * this page dies the buttons come back by themselves.
+ *
+ * Points 1-7 stay as the fallback for browsers - where the physical keys cannot
+ * be blocked at all - and as defence in depth: loudness and haptics escalate so
+ * an alarm that somehow got turned down is still audible.
+ *
+ * What no app can block: Home, Recents and the power button, and the volume
+ * keys while the screen is off or another window has focus (system handles them).
  */
+
+/**
+ * State of the native (Android) hardware-key lock:
+ *  - inactive:    no alarm is ringing
+ *  - unavailable: not running in the Android app (browser / dev server) - the physical keys cannot be blocked
+ *  - pending:     engaging, waiting for the native side to confirm
+ *  - locked:      confirmed - volume keys and Back are being swallowed natively
+ *  - failed:      the native side did not confirm (retried on every heartbeat)
+ */
+export type HardwareKeysState = 'inactive' | 'unavailable' | 'pending' | 'locked' | 'failed';
 
 export interface VolumeLockStatus {
   active: boolean;
@@ -44,6 +64,8 @@ export interface VolumeLockStatus {
   mediaSessionLocked: boolean;
   wakeLockHeld: boolean;
   hapticsActive: boolean;
+  /** Native hardware-key lock (volume keys + Back); only ever `locked` inside the Android app. */
+  hardwareKeys: HardwareKeysState;
 }
 
 export interface EngageOptions {
@@ -85,13 +107,30 @@ function emptyStatus(): VolumeLockStatus {
     mediaSessionLocked: false,
     wakeLockHeld: false,
     hapticsActive: false,
+    hardwareKeys: 'inactive',
   };
 }
 
 type Listener = (status: VolumeLockStatus, event: string) => void;
 
+/**
+ * How long the native lock survives without a renewal, and how often we renew it. The ratio
+ * tolerates ~3 missed heartbeats (a slow frame, a throttled background timer) before the
+ * buttons would come back; a dead page releases them within one lease.
+ */
+export const NATIVE_LEASE_MS = 6000;
+export const NATIVE_HEARTBEAT_MS = 1500;
+
 /** DOM event fired on `window` whenever a silencing attempt is blocked. */
 export const VOLUME_LOCK_BLOCKED_EVENT = 'niqu-volume-lock-blocked';
+
+/** `detail` of {@link VOLUME_LOCK_BLOCKED_EVENT}. */
+export interface VolumeLockBlockedDetail {
+  /** `hardware` = a physical button swallowed by the native lock; `key`/`media` = browser-level guards. */
+  source: 'key' | 'media' | 'hardware';
+  /** Which physical button, for `hardware` attempts. */
+  key?: HardwareKey;
+}
 
 class VolumeLockGuard {
   private status: VolumeLockStatus = emptyStatus();
@@ -108,6 +147,12 @@ class VolumeLockGuard {
   private gestureUnlock: (() => void) | null = null;
   private beforeUnload: ((e: BeforeUnloadEvent) => void) | null = null;
   private visibilityHandler: (() => void) | null = null;
+  /** Bumped on every engage/disengage so late native replies from an old session are ignored. */
+  private nativeSession = 0;
+  private lastNativeBeatAt = 0;
+  private unlistenNative: (() => void) | null = null;
+  /** True from engage() until its release has been sent, so a repeated disengage() sends nothing. */
+  private nativeArmed = false;
 
   // ------------------------------------------------------------------ public
 
@@ -154,6 +199,9 @@ class VolumeLockGuard {
 
     // Push the alarm bus to full loudness right away when escalation is on.
     audioEngine.forceLoud();
+
+    // Android app: arm the native lock that swallows the physical volume keys and Back.
+    this.engageNativeLock();
     this.emit('engaged');
   }
 
@@ -165,6 +213,7 @@ class VolumeLockGuard {
     this.detachExitGuard();
     this.unlockMediaSession();
     this.releaseWakeLock();
+    this.releaseNativeLock();
     audioEngine.stopEscalationSiren();
     if ('vibrate' in navigator) {
       try { navigator.vibrate(0); } catch { /* ignore */ }
@@ -246,6 +295,10 @@ class VolumeLockGuard {
       this.requestWakeLock();
     }
 
+    // 4. Heartbeat for the native hardware-key lease (no-op outside the Android app). If these
+    //    renewals ever stop, the native side lets go of the buttons on its own.
+    if (Date.now() - this.lastNativeBeatAt >= NATIVE_HEARTBEAT_MS) this.renewNativeLock();
+
     // The watchdog runs 5x/second; only notify the UI when something actually
     // changed, or once per second so the elapsed-time readout stays live.
     const changed =
@@ -254,7 +307,8 @@ class VolumeLockGuard {
       before.wakeLockHeld !== this.status.wakeLockHeld ||
       before.mediaSessionLocked !== this.status.mediaSessionLocked ||
       before.hapticsActive !== this.status.hapticsActive ||
-      before.audioWatchdogActive !== this.status.audioWatchdogActive;
+      before.audioWatchdogActive !== this.status.audioWatchdogActive ||
+      before.hardwareKeys !== this.status.hardwareKeys;
 
     const now = Date.now();
     if (changed || now - this.lastEmitAt >= 1000) {
@@ -290,7 +344,7 @@ class VolumeLockGuard {
     }
   }
 
-  private registerBlockedAttempt(source: 'key' | 'media'): void {
+  private registerBlockedAttempt(source: VolumeLockBlockedDetail['source'], key?: HardwareKey): void {
     this.status.blockedAttempts += 1;
     this.status.lastAttemptAt = Date.now();
     // Bump loudness immediately: the alarm gets louder, not quieter.
@@ -304,10 +358,77 @@ class VolumeLockGuard {
 
     // Let the ringing UI react instantly (toast + shake animation).
     try {
-      window.dispatchEvent(new CustomEvent(VOLUME_LOCK_BLOCKED_EVENT, { detail: { source } }));
+      window.dispatchEvent(
+        new CustomEvent<VolumeLockBlockedDetail>(VOLUME_LOCK_BLOCKED_EVENT, { detail: { source, key } })
+      );
     } catch { /* ignore */ }
 
-    this.emit(source === 'key' ? 'key-blocked' : 'media-blocked');
+    this.emit(source === 'key' ? 'key-blocked' : source === 'media' ? 'media-blocked' : 'hardware-blocked');
+  }
+
+  // ------------------------------------------------- native hardware-key lock
+
+  /** Starts a native lock session (Android app only). Called once per engage(). */
+  private engageNativeLock(): void {
+    const session = ++this.nativeSession;
+    this.lastNativeBeatAt = 0;
+
+    if (!nativeAlarmLock.isAvailable()) {
+      this.status.hardwareKeys = 'unavailable';
+      return;
+    }
+    this.status.hardwareKeys = 'pending';
+    this.nativeArmed = true;
+
+    // Physical presses swallowed natively feed the same pipeline as browser-level attempts:
+    // loudness bump, haptics, and the toast in the ringing UI.
+    nativeAlarmLock
+      .onKeyBlocked((event) => {
+        if (session === this.nativeSession) this.registerBlockedAttempt('hardware', event.key);
+      })
+      .then((unlisten) => {
+        if (session === this.nativeSession && this.status.active) this.unlistenNative = unlisten;
+        else unlisten(); // the alarm ended while we were still subscribing
+      })
+      .catch((err) => console.warn('[volumeLock] could not subscribe to native key events', err));
+
+    this.renewNativeLock();
+  }
+
+  /** (Re)arms the native lease: on engage, from the tick() heartbeat, and on returning to the app. */
+  private renewNativeLock(): void {
+    if (!this.status.active || !nativeAlarmLock.isAvailable()) return;
+    const session = this.nativeSession;
+    this.lastNativeBeatAt = Date.now();
+    nativeAlarmLock.engage(NATIVE_LEASE_MS).then(
+      (state) => this.setHardwareKeys(session, state.engaged ? 'locked' : 'failed'),
+      (err) => {
+        // A failing heartbeat is retried every beat; only log the first failure.
+        if (this.status.hardwareKeys !== 'failed') console.warn('[volumeLock] native hardware-key lock failed', err);
+        this.setHardwareKeys(session, 'failed');
+      }
+    );
+  }
+
+  private setHardwareKeys(session: number, next: HardwareKeysState): void {
+    // Replies that belong to an alarm session which has already ended must not touch the status.
+    if (session !== this.nativeSession || !this.status.active) return;
+    if (this.status.hardwareKeys === next) return;
+    this.status.hardwareKeys = next;
+    this.emit('hardware-keys');
+  }
+
+  /** Ends the native lock session. Safe to call repeatedly, and when no lock was ever engaged. */
+  private releaseNativeLock(): void {
+    this.nativeSession++; // from now on, every in-flight reply and event of the old session is ignored
+    if (this.unlistenNative) {
+      this.unlistenNative();
+      this.unlistenNative = null;
+    }
+    if (!this.nativeArmed) return; // nothing engaged by this session, or already released
+    this.nativeArmed = false;
+    // If this call is somehow lost, the native lease lapses by itself within NATIVE_LEASE_MS.
+    nativeAlarmLock.release().catch((err) => console.warn('[volumeLock] native release failed', err));
   }
 
   // ---------------------------------------------------------------- MediaSession
@@ -427,6 +548,7 @@ class VolumeLockGuard {
       if (this.status.active && document.visibilityState === 'visible') {
         audioEngine.forceLoud();
         this.requestWakeLock();
+        this.renewNativeLock();
       }
     };
     document.addEventListener('visibilitychange', this.visibilityHandler);

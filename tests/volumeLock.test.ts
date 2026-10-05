@@ -122,6 +122,7 @@ class FakeAudioContext {
   volumeLock.engage({ volumePercent: 80, escalation: true, haptics: true });
 
     check('lock engaged', volumeLock.isActive());
+  check('browser: native lock reported unavailable (never claims a hardware lock)', volumeLock.getStatus().hardwareKeys === 'unavailable', `hardwareKeys=${volumeLock.getStatus().hardwareKeys}`);
   check('keydown listener installed (window + document)', win.listenerCount('keydown') >= 1 && doc.listenerCount('keydown') >= 1);
   check('MediaSession handlers hijacked', typeof mediaHandlers.pause === 'function' && typeof mediaHandlers.stop === 'function');
   check('base escalation level is 0', (volumeLock.getStatus().escalationLevel === 0), `level=${volumeLock.getStatus().escalationLevel}`);
@@ -173,10 +174,188 @@ class FakeAudioContext {
   audioEngine.stopAlarmSound();
   volumeLock.disengage();
   check('lock released on dismiss', !volumeLock.isActive());
+  check('browser: hardware-key state resets to inactive on dismiss', volumeLock.getStatus().hardwareKeys === 'inactive');
   check('siren stopped on dismiss', (audioEngine as any).sirenNodes.length === 0);
   check('MediaSession handlers released', mediaHandlers.pause === null && mediaHandlers.stop === null);
   check('escalation reset', audioEngine.getEscalationLevel() === 0);
   check('alarm bus torn down', (audioEngine as any).alarmBus === null);
+
+  // 6. Android app: the NATIVE hardware-key lock ------------------------------
+  //    A fake plugin stands in for AlarmLockPlugin.java. The physical rocker itself can only be
+  //    tested on a phone, but the whole JS <-> native contract is checked here: arming, the
+  //    heartbeat that keeps the lease alive, key events, release, failures and stale replies.
+  const { setAlarmLockBackend } = await import('../src/utils/alarmLock');
+  const { NATIVE_LEASE_MS, NATIVE_HEARTBEAT_MS } = await import('../src/utils/volumeLock');
+
+  type NativeKeyListener = (e: { keyCode: number; key: string; blockedPresses: number }) => void;
+  const native = {
+    log: [] as string[],
+    engageCalls: [] as number[],
+    releaseCalls: 0,
+    removedListeners: 0,
+    listeners: new Set<NativeKeyListener>(),
+    failEngage: false,
+    failRelease: false,
+    failAddListener: false,
+    engageGate: null as Promise<void> | null,
+    async engage(o: { leaseMs: number }) {
+      native.log.push('engage');
+      native.engageCalls.push(o.leaseMs);
+      if (native.engageGate) await native.engageGate;
+      if (native.failEngage) throw new Error('native engage failed');
+      return { engaged: true, blockedPresses: 0, leaseRemainingMs: o.leaseMs };
+    },
+    async release() {
+      native.log.push('release');
+      native.releaseCalls++;
+      if (native.failRelease) throw new Error('native release failed');
+      return { engaged: false, blockedPresses: 0, leaseRemainingMs: 0 };
+    },
+    async getState() {
+      return { engaged: true, blockedPresses: 0, leaseRemainingMs: 0 };
+    },
+    async addListener(_event: string, listener: NativeKeyListener) {
+      if (native.failAddListener) throw new Error('native addListener failed');
+      native.listeners.add(listener);
+      return {
+        remove: async () => {
+          native.listeners.delete(listener);
+          native.removedListeners++;
+        },
+      };
+    },
+    /** What the phone does when the user presses a swallowed button. */
+    press(key: string, keyCode: number) {
+      native.listeners.forEach((l) => l({ key, keyCode, blockedPresses: 1 }));
+    },
+  };
+
+  const flush = () => new Promise<void>((r) => setImmediate(r));
+  const status = () => volumeLock.getStatus();
+
+  // Virtual clock + no real timers: tick() is driven by hand, so the checks are deterministic.
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  const advance = async (ms: number) => {
+    skew += ms;
+    (volumeLock as any).tick();
+    await flush();
+  };
+  const realSetInterval = win.setInterval;
+  win.setInterval = () => 0;
+  const domEvents: any[] = [];
+  win.dispatchEvent = (e: any) => {
+    domEvents.push(e);
+    return true;
+  };
+  const realWarn = console.warn;
+  const warnings: unknown[][] = [];
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+
+  setAlarmLockBackend(native as any);
+  vibrations = [];
+  audioEngine.startAlarmSound('nuclear', 80, false);
+  volumeLock.engage({ volumePercent: 80, escalation: true, haptics: true });
+
+  check('native: lock is "pending" until the phone confirms', status().hardwareKeys === 'pending', `state=${status().hardwareKeys}`);
+  await flush();
+  check('native: lock confirmed by the phone', status().hardwareKeys === 'locked', `state=${status().hardwareKeys}`);
+  check('native: armed exactly once on engage', native.engageCalls.length === 1, `calls=${native.engageCalls.length}`);
+  check(
+    'native: lease is a whole number inside the range the plugin accepts (2-60 s)',
+    Number.isInteger(native.engageCalls[0]) && native.engageCalls[0] >= 2000 && native.engageCalls[0] <= 60000,
+    `leaseMs=${native.engageCalls[0]}`
+  );
+  check('native: heartbeat tolerates >= 2 missed beats per lease', NATIVE_HEARTBEAT_MS * 3 <= NATIVE_LEASE_MS, `beat=${NATIVE_HEARTBEAT_MS} lease=${NATIVE_LEASE_MS}`);
+  check('native: subscribed to swallowed-key events', native.listeners.size === 1);
+
+  // The heartbeat keeps the lease alive for as long as the alarm rings.
+  await advance(100);
+  check('native: no renewal before the heartbeat interval', native.engageCalls.length === 1, `calls=${native.engageCalls.length}`);
+  await advance(NATIVE_HEARTBEAT_MS);
+  check('native: lease renewed by the heartbeat', native.engageCalls.length === 2, `calls=${native.engageCalls.length}`);
+  await advance(NATIVE_HEARTBEAT_MS);
+  check('native: ...and keeps being renewed', native.engageCalls.length === 3, `calls=${native.engageCalls.length}`);
+  doc.dispatch('visibilitychange', {});
+  await flush();
+  check('native: renewed at once when the user comes back to the app', native.engageCalls.length === 4, `calls=${native.engageCalls.length}`);
+
+  // A button swallowed natively goes through the same pipeline as a browser-level attempt.
+  const attemptsBefore = status().blockedAttempts;
+  native.press('volumeDown', 25);
+  check('native: swallowed volume-down counts as a blocked attempt', status().blockedAttempts === attemptsBefore + 1, `count=${status().blockedAttempts}`);
+  check('native: ...and escalates loudness', audioEngine.getEscalationLevel() >= 1);
+  check('native: ...and gives haptic feedback', vibrations.length > 0);
+  const lastDetail = () => domEvents[domEvents.length - 1]?.detail;
+  check('native: UI event says source=hardware and which key', lastDetail()?.source === 'hardware' && lastDetail()?.key === 'volumeDown', JSON.stringify(lastDetail()));
+  native.press('back', 4);
+  check('native: a swallowed Back press is reported to the UI as well', lastDetail()?.key === 'back', JSON.stringify(lastDetail()));
+
+  // Failure handling: a broken plugin must neither crash the alarm nor spam the log, and it heals.
+  native.failEngage = true;
+  await advance(NATIVE_HEARTBEAT_MS);
+  check('native: a failed renewal shows as "failed" while the JS guard keeps running', status().hardwareKeys === 'failed' && volumeLock.isActive(), `state=${status().hardwareKeys}`);
+  await advance(NATIVE_HEARTBEAT_MS);
+  check('native: a failing heartbeat is logged once, not on every beat', warnings.length === 1, `warnings=${warnings.length}`);
+  native.failEngage = false;
+  await advance(NATIVE_HEARTBEAT_MS);
+  check('native: heals on the next heartbeat', status().hardwareKeys === 'locked', `state=${status().hardwareKeys}`);
+
+  // Dismissing the alarm releases the native lock and detaches from it.
+  const staleListener = [...native.listeners][0];
+  const releasesBefore = native.releaseCalls;
+  volumeLock.disengage();
+  await flush();
+  check('native: release sent when the alarm is dismissed', native.releaseCalls === releasesBefore + 1, `releases=${native.releaseCalls - releasesBefore}`);
+  check('native: key subscription removed on dismiss', native.listeners.size === 0 && native.removedListeners >= 1);
+  check('native: hardware-key state back to inactive', status().hardwareKeys === 'inactive');
+  staleListener({ key: 'volumeDown', keyCode: 25, blockedPresses: 9 });
+  check('native: a late event from the finished alarm is ignored', status().blockedAttempts === 0, `count=${status().blockedAttempts}`);
+  let threw = false;
+  const releasesAfterFirst = native.releaseCalls;
+  try { volumeLock.disengage(); volumeLock.disengage(); } catch { threw = true; }
+  await flush();
+  check('native: repeated disengage() neither throws nor re-sends the release', !threw && native.releaseCalls === releasesAfterFirst, `extra releases=${native.releaseCalls - releasesAfterFirst}`);
+
+  // Dismissed before the phone even answered: the late reply must not revive anything, and the
+  // release must be queued behind the engage so the phone's final state is "released".
+  let openGate!: () => void;
+  native.engageGate = new Promise<void>((r) => { openGate = r; });
+  native.log.length = 0;
+  volumeLock.engage({ volumePercent: 80 });
+  volumeLock.disengage();
+  openGate();
+  native.engageGate = null;
+  await flush();
+  check('native: a reply arriving after dismiss does not revive the lock', !volumeLock.isActive() && status().hardwareKeys === 'inactive', `state=${status().hardwareKeys}`);
+  check('native: release is queued behind the pending engage', native.log.join(',') === 'engage,release', native.log.join(','));
+
+  // A second alarm after the first works from scratch.
+  volumeLock.engage({ volumePercent: 80 });
+  await flush();
+  check('native: a second alarm engages the lock again', status().hardwareKeys === 'locked' && native.listeners.size === 1, `state=${status().hardwareKeys}`);
+  volumeLock.disengage();
+  await flush();
+
+  // Plugin hiccups: neither a failing subscription nor a failing release may break the alarm.
+  native.failAddListener = true;
+  native.failRelease = true;
+  volumeLock.engage({ volumePercent: 80 });
+  await flush();
+  check('native: a failing key subscription does not break the lock', status().hardwareKeys === 'locked', `state=${status().hardwareKeys}`);
+  volumeLock.disengage();
+  await flush(); // an unhandled rejection from release() would crash the run right here
+  check('native: a failing release() is contained (the native lease expiry is the backstop)', !volumeLock.isActive());
+
+  // Restore the harness.
+  native.failAddListener = false;
+  native.failRelease = false;
+  audioEngine.stopAlarmSound();
+  setAlarmLockBackend(undefined);
+  win.setInterval = realSetInterval;
+  Date.now = realNow;
+  console.warn = realWarn;
 
   // Print
   let pass = 0;
