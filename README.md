@@ -86,9 +86,33 @@ many volume presses the ringing service has swallowed.
 | Re-arm after reboot | ✗ | ✓ |
 | First-run wizard, editor, reliability panel | ✓ | ✓ |
 
+## Brand assets
+
+The logo is vector art in `assets/brand/` — that directory is the single source of truth, and every
+raster asset in the repo is generated from it:
+
+| Master SVG | Generated output |
+|---|---|
+| `niqu-logo.svg` (navy letters, light backgrounds) | `public/logo.png` |
+| `niqu-logo-light.svg` (light letters, dark backgrounds) | `public/logo-light.png` |
+| `niqu-icon.svg` (square tile mark) | `public/favicon.png`, `public/apple-touch-icon.png`, `public/app-icon-{192,512}.png`, `public/niqu-icon.svg`, `mipmap-*/ic_launcher.png`, `drawable*/splash.png` |
+| `niqu-icon-round.svg` | `mipmap-*/ic_launcher_round.png` |
+| `niqu-icon-foreground.svg` (safe-zone padded) | `mipmap-*/ic_launcher_foreground.png` (adaptive icon foreground) |
+
+In-app the wordmark is rendered as inline SVG by `src/components/AppLogo.tsx` (`<AppLogo>` for the
+header, `<AppMark>` for the About card), so it stays crisp and themeable and picks up the Amharic app
+name through `aria-label`. That component is a hand-kept transcription of the master SVGs — if you
+edit the artwork, update both.
+
+Android extras: the adaptive icon background is `drawable/ic_launcher_background.xml` (the brand
+tile gradient), and the status-bar icon for the ringing alarm stays a plain white alarm-clock
+silhouette (`drawable/ic_stat_niqu_alarm.xml`), because Android tints notification small icons and
+needs a monochrome shape.
+
 ## Layout
 
 ```
+assets/brand/       logo SVG masters (source of truth for every icon/splash asset)
 src/                React app (Vite + Tailwind)
   components/       AlarmClock, AlarmEditorModal, OnboardingTour, AlarmRingingModal, ...
   utils/            alarmScheduler.ts (native bridge), alarmText.ts, firstRun.ts, volumeLock.ts, ...

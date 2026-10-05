@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
 import { APP_NAME, APP_VERSION } from '../constants';
+import { AppMark } from './AppLogo';
 import { nativeAlarmLock } from '../utils/alarmLock';
 import { WakeUpReliabilityModal } from './WakeUpReliabilityModal';
 import {
@@ -657,7 +658,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* About Modal */}
               {activeModal === 'about' && (
                 <div className="space-y-3 text-xs text-slate-300 text-center">
-                  <div className="text-3xl">⏰</div>
+                  <AppMark className="w-16 h-16 mx-auto" />
                   <h4 className="font-bold text-sm text-white">{APP_NAME} v{APP_VERSION}</h4>
                   <p className="text-slate-400">Built with React, Vite, and Web Audio API.</p>
                   <div className="pt-2">
