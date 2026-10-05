@@ -37,7 +37,7 @@ import {
 import { SettingsView } from './components/SettingsView';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('alarms');
+  const [activeTab, setActiveTab] = useState<TabType>('alarm');
   const [isNightstandMode, setIsNightstandMode] = useState<boolean>(false);
   // First launch ends with an alarm: the wizard is the only screen until the user sets one, and it
   // stops coming back afterwards (it is still reachable from Settings for a re-run).
@@ -47,6 +47,8 @@ export default function App() {
       hasOwnAlarm: hasUserSetOwnAlarm(loadAlarms()),
     })
   );
+  // The alarm editor is a dedicated screen, so hide the global navigation while it is active.
+  const [isAlarmEditorVisible, setIsAlarmEditorVisible] = useState<boolean>(firstAlarmRequired);
   // First-run setup stays inside the alarm dashboard; the editor is opened from that screen.
   const [showTour, setShowTour] = useState<boolean>(false);
   // Briefly rings the card of the alarm the wizard just created, so the user sees it landed.
@@ -320,27 +322,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0e0f12] text-slate-100 font-sans antialiased selection:bg-red-500 selection:text-white">
-      {/* Navbar Header */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        nextAlarmTime={getNextAlarmTime()}
-        toggleNightstand={() => setIsNightstandMode(true)}
-        language={language}
-        setLanguage={setLanguage}
-      />
+      {/* Global navigation is hidden during the full-screen alarm setup flow. */}
+      {!isAlarmEditorVisible && (
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          nextAlarmTime={getNextAlarmTime()}
+          toggleNightstand={() => setIsNightstandMode(true)}
+          language={language}
+          setLanguage={setLanguage}
+        />
+      )}
 
       {/* Main Content Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-hidden">
+      <main className={isAlarmEditorVisible ? 'min-h-screen w-full overflow-visible' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-hidden'}>
         <AnimatePresence mode="wait">
-          {(activeTab === 'alarm' || activeTab === 'alarms') && (
-            <motion.div
-              key="alarm"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
+          {activeTab === 'alarm' && (
+            <div key="alarm">
               <AlarmClock
                 alarms={alarms}
                 onAddAlarm={handleAddAlarm}
@@ -350,8 +348,9 @@ export default function App() {
                 language={language}
                 highlightAlarmId={highlightAlarmId}
                 openEditorOnMount={firstAlarmRequired}
+                onEditorVisibilityChange={setIsAlarmEditorVisible}
               />
-            </motion.div>
+            </div>
           )}
 
           {activeTab === 'sleep' && (

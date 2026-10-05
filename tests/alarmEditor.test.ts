@@ -1,16 +1,14 @@
 /**
- * Render harness for the simplified alarm editor.
+ * Render harness for the single-screen alarm setup flow.
  *
- * The editor is deliberately small - time, days, name, sound, mission - so this test renders it to
- * static markup and pins that shape down: the 12-hour time and its tap-to-edit picker, the day
- * chips, the two rows, and the absence of the sections that used to bloat the screen (a volume
- * slider, a wallpaper picker, a tone test button). It also proves the wiring survives both
- * languages and both add and edit mode.
+ * The time is edited with inline digit fields/steppers (never the platform's radial picker), while
+ * repeat, sound and mission choices remain visible in the same page. This test pins down that
+ * shape, the essential controls, and the English/Amharic labels.
  */
 (async () => {
   const React = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
-  const { default: AlarmEditorModal } = await import('../src/components/AlarmEditorModal');
+  const { default: AlarmEditorScreen, getTimeParts, stepHour, to24HourTime } = await import('../src/components/AlarmEditorScreen');
   const { createElement: h } = React;
 
   const results: [string, boolean, string][] = [];
@@ -18,7 +16,6 @@
 
   const render = (overrides: Record<string, unknown> = {}) => {
     const props: Record<string, unknown> = {
-      isOpen: true,
       editingAlarm: null,
       language: 'en',
       time: '06:30',
@@ -28,55 +25,64 @@
       repeatDays: [1, 2, 3, 4, 5],
       onToggleDay: () => {},
       sound: 'sunrise',
-      onBrowseSound: () => {},
+      onSoundChange: () => {},
+      volume: 80,
+      onVolumeChange: () => {},
+      gentleWakeUp: true,
+      onGentleWakeUpChange: () => {},
       challenge: 'math',
       onChallengeChange: () => {},
+      canCancel: true,
       onCancel: () => {},
       onSave: () => {},
       ...overrides,
     };
-    return renderToStaticMarkup(h(AlarmEditorModal, props));
+    return renderToStaticMarkup(h(AlarmEditorScreen, props));
   };
 
   const html = render();
+  const repeatMarkup = html.match(/aria-label="Repeat Days">([\s\S]*?)<\/section>/)?.[1] ?? '';
 
-  // --- What must be there: the essentials ----------------------------------
+  // --- One page, no OS time picker or modal backdrop ------------------------
   check('add mode title', html.includes('Add New Alarm'));
   check('edit mode title', render({ editingAlarm: { id: '1' } }).includes('Edit Alarm'));
-  check('time shown 12-hour', html.includes('>6:30<') && html.includes('>am<'));
-  check("time opens the phone's own picker", html.includes('type="time"') && html.includes('value="06:30"'));
-  check('next-up summary line', html.includes('Weekdays (Mon-Fri)'));
-  check('day chips selected state', (html.match(/aria-pressed="true"/g) || []).length === 5);
-  check('day chips total', (html.match(/aria-pressed="/g) || []).length === 7);
-  check('name field', html.includes('value="Morning Wake Up"'));
-  check('sound row with the chosen tone', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
-  check('mission row with the chosen mission', html.includes('Wake-up Mission') && html.includes('Math equations'));
-  check('save button in the header and at the bottom', (html.match(/Save Alarm/g) || []).length === 2);
+  check('inline hour and minute digit fields', html.includes('id="alarm-hour-input"') && html.includes('id="alarm-minute-input"'));
+  check('time fields are numeric text inputs', html.toLowerCase().includes('inputmode="numeric"') && !html.includes('type="time"'));
+  check('time digits are shown as 12-hour values', html.includes('value="06"') && html.includes('value="30"') && html.includes('>AM<'));
+  check('dedicated AM/PM controls are present', html.includes('aria-label="AM or PM"') && html.includes('>PM<'));
+  check('no editor or ringtone modal backdrop', !html.includes('alarm-editor-backdrop') && !html.includes('ringtone-picker-backdrop'));
+  check('bottom save CTA is present once', (html.match(/Save Alarm/g) || []).length === 1);
+  check('cancel is hidden for mandatory first setup', !render({ canCancel: false }).includes('aria-label="Cancel"'));
 
-  // --- What must not be there any more -------------------------------------
-  check('no volume slider', !html.includes('type="range"'));
-  check('no target volume section', !html.includes('Target Volume'));
-  check('no wallpaper picker', !html.includes('Wallpaper'));
-  check('no tone test button', !html.includes('Test Tone') && !html.includes('Browse Picker'));
-  check('no debugger of raw sections', !html.includes('Gentle Wake'));
+  // --- The configuration stays available below the time card ----------------
+  check('repeat summary and all seven day buttons', html.includes('Weekdays (Mon-Fri)') && (repeatMarkup.match(/aria-label="(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)"/g) || []).length === 7);
+  check('five weekday buttons are selected', (repeatMarkup.match(/aria-pressed="true"/g) || []).length === 5);
+  check('alarm name field', html.includes('id="alarm-label-input"') && html.includes('value="Morning Wake Up"'));
+  check('sound row displays the chosen tone', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
+  check('sound choices are available inline', html.includes('aria-label="Sound &amp; Ringtone"') && html.includes('Browse all'));
+  check('wake-up mission is selectable inline', html.includes('Wake-up Mission') && html.includes('aria-label="Wake-up Mission"'));
+  check('volume and gentle wake-up controls are retained', html.includes('type="range"') && html.includes('role="switch"'));
 
-  // --- Language and modes ---------------------------------------------------
+  // --- Special values, language, and editing modes --------------------------
   const amharic = render({ language: 'am' });
-  check('amharic title', amharic.includes('አዲስ ማንቂያ ጨምር'));
-  check('amharic save', amharic.includes('ማንቂያውን አስቀምጥ'));
-  check('amharic repeat summary', amharic.includes('የስራ ቀናት'));
-  check('amharic day chips', amharic.includes('ሰኞ'));
-
-  check('one-time alarm says Once', render({ repeatDays: [] }).includes('Once'));
-  check('every-day alarm says Every day', render({ repeatDays: [0, 1, 2, 3, 4, 5, 6] }).includes('Every day'));
-  check('rest-day alarm says Weekends', render({ repeatDays: [0, 6] }).includes('Weekends (Sat-Sun)'));
-  check('dismiss-only mission is labelled', render({ challenge: 'none' }).includes('Dismiss button only'));
-  check('a custom mission label appears', render({ challenge: 'typing' }).includes('Type an affirmation'));
+  check('amharic title and save CTA', amharic.includes('አዲስ ማንቂያ ጨምር') && amharic.includes('ማንቂያውን አስቀምጥ'));
+  check('amharic repeat summary and accessible day chips', amharic.includes('የስራ ቀናት') && amharic.includes('aria-label="ሰኞ"'));
+  check('one-time repeat label', render({ repeatDays: [] }).includes('Once'));
+  check('every-day repeat label', render({ repeatDays: [0, 1, 2, 3, 4, 5, 6] }).includes('Every day'));
+  check('weekend repeat label', render({ repeatDays: [0, 6] }).includes('Weekends (Sat-Sun)'));
+  check('dismiss-only mission is labelled', render({ challenge: 'none' }).includes('Dismiss only'));
+  check('affirmation mission is available', render({ challenge: 'typing' }).includes('Affirmation'));
   check('unknown sound falls back to its id', render({ sound: 'unknown-tone' }).includes('unknown-tone'));
-  check('empty name still renders', render({ label: '' }).includes('Alarm name'));
-  check('midnight formats as 12 am', render({ time: '00:00' }).includes('>12:00<') && render({ time: '00:00' }).includes('>am<'));
-  check('midday formats as 12 pm', render({ time: '12:00' }).includes('>12:00<') && render({ time: '12:00' }).includes('>pm<'));
-  check('closed renders nothing', render({ isOpen: false }) === '');
+  check('empty label remains editable', render({ label: '' }).includes('id="alarm-label-input"'));
+  check('midnight is represented as 12 AM', render({ time: '00:00' }).includes('value="12"') && render({ time: '00:00' }).includes('>AM<'));
+  check('midday is represented as 12 PM', render({ time: '12:00' }).includes('value="12"') && render({ time: '12:00' }).includes('>PM<'));
+  check('12 AM converts to midnight', to24HourTime({ hour: '12', minute: '00', period: 'AM' }) === '00:00');
+  check('12 PM converts to noon', to24HourTime({ hour: '12', minute: '00', period: 'PM' }) === '12:00');
+  check('afternoon input converts to 24-hour storage', to24HourTime({ hour: '1', minute: '15', period: 'PM' }) === '13:15');
+  check('display fields split stored 24-hour time', JSON.stringify(getTimeParts('23:09')) === JSON.stringify({ hour: '11', minute: '09', period: 'PM' }));
+  check('stepping from 11 AM advances to 12 PM', JSON.stringify(stepHour({ hour: '11', minute: '00', period: 'AM' }, 1)) === JSON.stringify({ hour: '12', minute: '00', period: 'PM' }));
+  check('stepping back from 12 AM reaches 11 PM', JSON.stringify(stepHour({ hour: '12', minute: '00', period: 'AM' }, -1)) === JSON.stringify({ hour: '11', minute: '00', period: 'PM' }));
+  check('invalid digits are clamped safely', to24HourTime({ hour: '25', minute: '99', period: 'PM' }) === '12:59');
 
   // --- Report ---------------------------------------------------------------
   let pass = 0;

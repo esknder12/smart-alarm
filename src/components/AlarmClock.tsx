@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption } from '../types';
 import { Language, translations } from '../utils/translations';
 import { Plus, Trash2, Bell, Edit2, Calendar, Zap, X, Check } from 'lucide-react';
-import { RingtonePickerModal } from './RingtonePickerModal';
 import { QuickAlarmModal } from './QuickAlarmModal';
-import AlarmEditorModal from './AlarmEditorModal';
+import AlarmEditorScreen from './AlarmEditorScreen';
 import { HabitAlarmWizardModal } from './HabitAlarmWizardModal';
 import { MorningInspiration } from './MorningInspiration';
 import { getNotificationStatus, requestNotificationPermission, NotificationStatus } from '../utils/notifications';
@@ -19,8 +18,10 @@ interface AlarmClockProps {
   language?: Language;
   /** Id of a newly created alarm: its card is rung for a few seconds so the user sees it landed. */
   highlightAlarmId?: string | null;
-  /** Open the standard alarm editor on first launch, without leaving the dashboard. */
+  /** Open the full-screen alarm setup on first launch. */
   openEditorOnMount?: boolean;
+  /** Let the app shell hide its navigation while the single-screen editor is active. */
+  onEditorVisibilityChange?: (visible: boolean) => void;
 }
 
 export const WALLPAPERS: WallpaperOption[] = [
@@ -40,9 +41,14 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   language = 'en',
   highlightAlarmId = null,
   openEditorOnMount = false,
+  onEditorVisibilityChange,
 }: AlarmClockProps) => {
-  const [isModalOpen, setIsModalOpen] = useState(openEditorOnMount);
+  const [isEditorOpen, setIsEditorOpen] = useState(openEditorOnMount);
   const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
+
+  React.useEffect(() => {
+    onEditorVisibilityChange?.(isEditorOpen);
+  }, [isEditorOpen, onEditorVisibilityChange]);
 
   // Form State
   const [time, setTime] = useState('07:00');
@@ -115,10 +121,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     });
   };
 
-  // Ringtone picker state
-  const [isRingtonePickerOpen, setIsRingtonePickerOpen] = useState(false);
-
-  const openAddModal = () => {
+  const openAddEditor = () => {
     setEditingAlarm(null);
     setTime('07:00');
     setLabel('Morning Wake Up');
@@ -129,10 +132,11 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setWallpaper('capybara');
     setChallenge('math');
     setChallengeDifficulty('easy');
-    setIsModalOpen(true);
+    setIsEditorOpen(true);
+    onEditorVisibilityChange?.(true);
   };
 
-  const openEditModal = (alarm: Alarm) => {
+  const openEditEditor = (alarm: Alarm) => {
     setEditingAlarm(alarm);
     setTime(alarm.time);
     setLabel(alarm.label);
@@ -143,7 +147,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setWallpaper(alarm.wallpaper ?? 'capybara');
     setChallenge(alarm.challenge);
     setChallengeDifficulty(alarm.challengeDifficulty);
-    setIsModalOpen(true);
+    setIsEditorOpen(true);
+    onEditorVisibilityChange?.(true);
   };
 
   const toggleDay = (dayIndex: number) => {
@@ -182,8 +187,40 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         challengeDifficulty,
       });
     }
-    setIsModalOpen(false);
+    setIsEditorOpen(false);
+    onEditorVisibilityChange?.(false);
   };
+
+  if (isEditorOpen) {
+    return (
+      <AlarmEditorScreen
+        key={editingAlarm?.id ?? 'new-alarm'}
+        editingAlarm={editingAlarm}
+        language={language}
+        time={time}
+        onTimeChange={setTime}
+        label={label}
+        onLabelChange={setLabel}
+        repeatDays={repeatDays}
+        onToggleDay={toggleDay}
+        sound={sound}
+        onSoundChange={setSound}
+        volume={volume}
+        onVolumeChange={setVolume}
+        gentleWakeUp={gentleWakeUp}
+        onGentleWakeUpChange={setGentleWakeUp}
+        challenge={challenge}
+        onChallengeChange={setChallenge}
+        canCancel={!openEditorOnMount}
+        onCancel={() => {
+          if (openEditorOnMount) return;
+          setIsEditorOpen(false);
+          onEditorVisibilityChange?.(false);
+        }}
+        onSave={handleSubmit}
+      />
+    );
+  }
 
   return (
     <div id="alarm-clock-view" className="space-y-6">
@@ -288,7 +325,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                   </button>
 
                   <button
-                    onClick={() => openEditModal(alarm)}
+                    onClick={() => openEditEditor(alarm)}
                     className="p-1.5 text-slate-400 hover:text-white transition"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -368,7 +405,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 transition={{ duration: 0.15 }}
                 onClick={() => {
                   setIsFabOpen(false);
-                  openAddModal();
+                  openAddEditor();
                 }}
                 className="bg-white text-slate-900 font-bold text-sm py-3.5 px-6 rounded-2xl shadow-2xl flex items-center space-x-3 transition hover:bg-slate-50 active:scale-95 border-2 border-slate-200"
               >
@@ -403,37 +440,6 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
           )}
         </button>
       </div>
-
-      {/* Add / Edit Alarm Modal - kept as short as the phone's own alarm dialog */}
-      <AlarmEditorModal
-        isOpen={isModalOpen}
-        editingAlarm={editingAlarm}
-        language={language}
-        time={time}
-        onTimeChange={setTime}
-        label={label}
-        onLabelChange={setLabel}
-        repeatDays={repeatDays}
-        onToggleDay={toggleDay}
-        sound={sound}
-        onBrowseSound={() => setIsRingtonePickerOpen(true)}
-        challenge={challenge}
-        onChallengeChange={setChallenge}
-        onCancel={() => setIsModalOpen(false)}
-        onSave={handleSubmit}
-      />
-
-      {/* Android Ringtone Picker Modal */}
-      <RingtonePickerModal
-        isOpen={isRingtonePickerOpen}
-        onClose={() => setIsRingtonePickerOpen(false)}
-        selectedSound={sound}
-        onSelectSound={(newSound) => setSound(newSound)}
-        volume={volume}
-        onVolumeChange={(newVol) => setVolume(newVol)}
-        gentleWakeUp={gentleWakeUp}
-        onGentleWakeUpChange={(newGentle) => setGentleWakeUp(newGentle)}
-      />
 
       {/* Quick Alarm Modal matching Image 5 */}
       <QuickAlarmModal
