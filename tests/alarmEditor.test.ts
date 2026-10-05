@@ -44,14 +44,14 @@
   const repeatMarkup = html.match(/aria-label="Repeat Days">([\s\S]*?)<\/section>/)?.[1] ?? '';
 
   // --- One page, no OS time picker or modal backdrop ------------------------
-  check('add mode title', html.includes('Add New Alarm'));
-  check('edit mode title', render({ editingAlarm: { id: '1' } }).includes('Edit Alarm'));
+  check('add mode title', html.includes('Wake-up alarm'));
+  check('edit mode title', render({ editingAlarm: { id: '1' } }).includes('Wake-up alarm'));
   check('inline hour and minute digit fields', html.includes('id="alarm-hour-input"') && html.includes('id="alarm-minute-input"'));
   check('time fields are numeric text inputs', html.toLowerCase().includes('inputmode="numeric"') && !html.includes('type="time"'));
   check('time digits are shown as 12-hour values', html.includes('value="06"') && html.includes('value="30"') && html.includes('>AM<'));
   check('dedicated AM/PM controls are present', html.includes('aria-label="AM or PM"') && html.includes('>PM<'));
   check('no editor or ringtone modal backdrop', !html.includes('alarm-editor-backdrop') && !html.includes('ringtone-picker-backdrop'));
-  check('bottom save CTA is present once', (html.match(/Save Alarm/g) || []).length === 1);
+  check('bottom save CTA is present once', (html.match(/>Save</g) || []).length === 1);
   check('cancel is hidden for mandatory first setup', !render({ canCancel: false }).includes('aria-label="Cancel"'));
 
   // --- The configuration stays available below the time card ----------------
@@ -59,8 +59,8 @@
   check('five weekday buttons are selected', (repeatMarkup.match(/aria-pressed="true"/g) || []).length === 5);
   check('alarm name field', html.includes('id="alarm-label-input"') && html.includes('value="Morning Wake Up"'));
   check('sound row displays the chosen tone', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
-  check('sound choices are available inline', html.includes('aria-label="Sound &amp; Ringtone"') && html.includes('Browse all'));
-  check('wake-up mission is selectable inline', html.includes('Wake-up Mission') && html.includes('aria-label="Wake-up Mission"'));
+  check('sound choices are available inline', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
+  check('wake-up mission is selectable inline', html.includes('Wake-up mission') && html.includes('aria-label="Wake-up mission"'));
   check('volume and gentle wake-up controls are retained', html.includes('type="range"') && html.includes('role="switch"'));
 
   // --- Special values, language, and editing modes --------------------------

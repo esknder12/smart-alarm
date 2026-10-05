@@ -69,6 +69,7 @@ the alarm needs to ring with the screen off. Settings → *revisit setup* re-ope
 | Notifications | Android 13+ | The wizard's last step, or Settings → Apps → Niqu → Notifications |
 | Alarms & reminders (exact alarms) | **Android 12 only** — on 13+ an alarm app is granted at install | Settings → Apps → Special app access → Alarms & reminders |
 | Full screen notifications | Android 14+ | Settings → Apps → Special app access → Full screen notifications |
+| Appear on top (draw over other apps) | Needed so the alarm comes in front of another open app | Settings → Apps → Special access → Appear on top (Samsung) / Display over other apps |
 | Background activity | Samsung / Xiaomi / Huawei battery managers can kill the ring | Settings → Battery → Background usage limits → make sure Niqu is not *sleeping* |
 
 The app itself tells you which of these is off: **Settings → Wake-Up Reliability** shows the exact

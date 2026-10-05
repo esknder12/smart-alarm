@@ -142,7 +142,7 @@ final class AlarmScheduler {
             .setAction(ACTION_FIRE)
             .setData(Uri.parse(ALARM_URI_PREFIX + Uri.encode(alarm.id)))
             .putExtra(EXTRA_ALARM_ID, alarm.id)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
     }
 
     static Intent exactAlarmPermissionIntent(Context context) {
@@ -164,6 +164,21 @@ final class AlarmScheduler {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true;
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         return manager == null || manager.canUseFullScreenIntent();
+    }
+
+    /** Samsung “Appear on top” / Settings.canDrawOverlays — alarm can sit in front of other apps. */
+    static boolean canDrawOverlays(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+        return Settings.canDrawOverlays(context);
+    }
+
+    static Intent overlayPermissionIntent(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                .setData(Uri.parse("package:" + context.getPackageName()));
+        }
+        return new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.parse("package:" + context.getPackageName()));
     }
 
     static boolean notificationsAllowed(Context context) {
