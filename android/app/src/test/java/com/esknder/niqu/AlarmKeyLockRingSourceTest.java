@@ -180,14 +180,16 @@ public class AlarmKeyLockRingSourceTest {
     @Test
     public void heartbeatRenewalsStillWorkWhileTheServiceRings() {
         startServiceRing();
-        lock.engage(AlarmKeyLock.DEFAULT_LEASE_MS);
+        lock.engage(AlarmKeyLock.DEFAULT_LEASE_MS); // the page arms its lease on top of the ring
 
         now += 1_500L;
+        assertEquals(AlarmKeyLock.DEFAULT_LEASE_MS - 1_500L, lock.getLeaseRemainingMs());
+
         lock.engage(AlarmKeyLock.DEFAULT_LEASE_MS); // the web layer's heartbeat
 
         assertTrue(lock.isEngaged());
-        assertEquals(AlarmKeyLock.DEFAULT_LEASE_MS - 1_500L, lock.getLeaseRemainingMs());
-        assertEquals(Arrays.asList(true), stateChanges);
+        assertEquals("a renewal restarts the whole lease", AlarmKeyLock.DEFAULT_LEASE_MS, lock.getLeaseRemainingMs());
+        assertEquals("renewals are not state changes", Arrays.asList(true), stateChanges);
     }
 
     // ------------------------------------------------------------------------------- detaching

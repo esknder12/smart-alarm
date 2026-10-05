@@ -243,8 +243,12 @@ final class AlarmKeyLock {
      */
     private int advanceLocked(long now) {
         int events = EV_NONE;
-        // Read the ring source first: if the alarm started ringing and the web lease ran out in the
-        // very same call, the keys must stay locked and no release may be reported.
+        // Remember where we started *before* anything is refreshed, or a ring that begins in this
+        // very call would look like "already locked" and no listener would hear about it.
+        boolean wasLive = lockedLocked();
+        // Then refresh the ring source, and only then look at the lease: if the alarm started
+        // ringing in the same breath as the web lease running out, the keys must stay locked and no
+        // release may be reported.
         RingSource source = ringSource;
         boolean ringsNow = source != null && source.isAlarmRinging();
         if (ringsNow != ringActive) {
@@ -253,7 +257,6 @@ final class AlarmKeyLock {
                 blockedPresses = 0; // a new alarm, a fresh count
             }
         }
-        boolean wasLive = lockedLocked();
         if (expireLocked(now) && !lockedLocked()) {
             events |= EV_RELEASED;
         }
