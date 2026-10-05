@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Alarm, SoundType, ChallengeType, WallpaperId, RINGTONES_CATALOG, SoundCategory } from '../types';
+import type { AlarmScheduleState } from '../utils/alarmScheduler';
 import { audioEngine } from '../utils/audio';
+import { nativeAlarmScheduler } from '../utils/alarmScheduler';
+import { buildFirstAlarm } from '../utils/firstRun';
+import { formatTime12h } from '../utils/alarmText';
 import {
   Trophy,
   Star,
@@ -27,6 +31,11 @@ import {
 interface OnboardingTourProps {
   onComplete: (newAlarm?: Omit<Alarm, 'id' | 'snoozeCount'>) => void;
   onClose: () => void;
+  /**
+   * First launch: the wizard is the only way into the app, so there is no close button and the last
+   * step spells out the alarm it is about to create. Re-opened from Settings it is optional.
+   */
+  mandatory?: boolean;
 }
 
 export interface ThemeOption {
@@ -134,7 +143,7 @@ export const AUDIO_TRACKS = [
   },
 ];
 
-export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onClose }) => {
+export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onClose, mandatory = false }) => {
   // Steps: 0 to 3 (4 setup steps)
   // 0: Step 1/4 - Set start time
   // 1: Step 2/4 - Mission category
@@ -147,8 +156,37 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
   const [minute, setMinute] = useState<string>('00');
   const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
 
-  // Permission Modal state
-  const [notificationAllowed, setNotificationAllowed] = useState<boolean>(true);
+  // Permissions the alarm needs to ring with the screen off (Android only; a browser reports
+  // `available: false` and the card stays hidden).
+  const [permissions, setPermissions] = useState<AlarmScheduleState | null>(null);
+  const [permissionBusy, setPermissionBusy] = useState<boolean>(false);
+
+  const refreshPermissions = async () => {
+    setPermissions(await nativeAlarmScheduler.getState());
+  };
+
+  React.useEffect(() => {
+    void refreshPermissions();
+  }, []);
+
+  const askForNotifications = async () => {
+    setPermissionBusy(true);
+    await nativeAlarmScheduler.requestNotificationPermission();
+    await refreshPermissions();
+    setPermissionBusy(false);
+  };
+
+  const askForExactAlarms = async () => {
+    setPermissionBusy(true);
+    await nativeAlarmScheduler.openSettings('exactAlarm');
+    await refreshPermissions();
+    setPermissionBusy(false);
+  };
+
+  const permissionsMissing =
+    !!permissions &&
+    permissions.available &&
+    (!permissions.notificationsAllowed || !permissions.exactAlarmsAllowed);
 
   // Theme state
   const [selectedTheme] = useState<WallpaperId>('nature');
@@ -165,6 +203,14 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
   const [volume, setVolume] = useState<number>(95);
   const [gentleMotivation, setGentleMotivation] = useState<boolean>(true);
 
+  const missionNames: Record<string, string> = {
+    math: 'Mindful Breathing',
+    tiles: 'Focus Game',
+    typing: 'Gratitude Journaling',
+    shake: 'Active Stretching',
+    none: 'No Mission',
+  };
+
   const handleToggleAudio = (snd: SoundType) => {
     if (isPlayingAudio && selectedAudio === snd) {
       audioEngine.stopAlarmSound();
@@ -176,6 +222,21 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
     }
   };
 
+  // The same builder that writes the alarm, so step 4 cannot promise a different time than the one
+  // that ends up in the list.
+  const firstAlarmPreview = formatTime12h(
+    buildFirstAlarm({
+      hour,
+      minute,
+      period,
+      mission: selectedMission,
+      sound: selectedAudio,
+      volume,
+      gentleWakeUp: gentleMotivation,
+      wallpaper: selectedTheme,
+    }).time
+  );
+
   const handleNext = () => {
     if (isPlayingAudio) {
       audioEngine.stopAlarmSound();
@@ -185,25 +246,20 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
     if (step < 3) {
       setStep(step + 1);
     } else {
-      // Step 3: Set and Go
-      let hInt = parseInt(hour, 10);
-      if (period === 'PM' && hInt < 12) hInt += 12;
-      if (period === 'AM' && hInt === 12) hInt = 0;
-      const formattedTime = `${hInt.toString().padStart(2, '0')}:${minute}`;
-
-      onComplete({
-        time: formattedTime,
-        label: 'Daily Motivation Alert',
-        enabled: true,
-        repeatDays: [1, 2, 3, 4, 5],
-        sound: selectedAudio,
-        volume,
-        gentleWakeUp: gentleMotivation,
-        wallpaper: selectedTheme,
-        snoozeCount: 0,
-        challenge: selectedMission,
-        challengeDifficulty: 'easy',
-      });
+      // Step 4 is the one that writes the alarm; the maths lives in utils/firstRun.ts so it is
+      // tested on its own (12:00 AM is midnight, not noon).
+      onComplete(
+        buildFirstAlarm({
+          hour,
+          minute,
+          period,
+          mission: selectedMission,
+          sound: selectedAudio,
+          volume,
+          gentleWakeUp: gentleMotivation,
+          wallpaper: selectedTheme,
+        })
+      );
     }
   };
 
@@ -249,12 +305,21 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="text-slate-500 hover:text-white p-1 rounded-full transition"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {mandatory ? (
+          // Nothing to close on first launch: the alarm has to exist before the app opens. The
+          // space is kept so the progress bar stays centred.
+          <div className="w-7" aria-hidden="true" />
+        ) : (
+          <button
+            id="btn-onboarding-close"
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="text-slate-500 hover:text-white p-1 rounded-full transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Main Content Body */}
@@ -263,6 +328,11 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
         {step === 0 && (
           <div className="text-center space-y-6 animate-fadeIn">
             <h2 className="text-2xl font-black tracking-tight text-white">Set your start time</h2>
+            <p className="text-xs font-semibold text-slate-400 -mt-3">
+              {mandatory
+                ? 'Pick the time you want to wake up - your first alarm is created at the end of these four steps.'
+                : 'Pick the time you want this alarm to ring.'}
+            </p>
 
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 relative my-4 shadow-xl">
               <div className="flex items-center justify-center space-x-3 font-mono">
@@ -342,11 +412,11 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
 
             <div className="space-y-2.5">
               {[
-                { id: 'math', name: 'Mindful Breathing', icon: <Wind className="w-5 h-5 text-white" /> },
-                { id: 'tiles', name: 'Focus Game', icon: <Target className="w-5 h-5 text-white" /> },
-                { id: 'typing', name: 'Gratitude Journaling', icon: <FileText className="w-5 h-5 text-white" /> },
-                { id: 'shake', name: 'Active Stretching', icon: <Activity className="w-5 h-5 text-white" /> },
-                { id: 'none', name: 'No Mission', icon: <X className="w-5 h-5 text-slate-400" /> },
+                { id: 'math', icon: <Wind className="w-5 h-5 text-white" /> },
+                { id: 'tiles', icon: <Target className="w-5 h-5 text-white" /> },
+                { id: 'typing', icon: <FileText className="w-5 h-5 text-white" /> },
+                { id: 'shake', icon: <Activity className="w-5 h-5 text-white" /> },
+                { id: 'none', icon: <X className="w-5 h-5 text-slate-400" /> },
               ].map((m) => (
                 <div
                   key={m.id}
@@ -360,7 +430,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
                   <div className="p-2.5 rounded-xl bg-slate-800/80 shrink-0">
                     {m.icon}
                   </div>
-                  <div className="font-bold text-white text-sm">{m.name}</div>
+                  <div className="font-bold text-white text-sm">{missionNames[m.id]}</div>
                 </div>
               ))}
             </div>
@@ -429,6 +499,20 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
           <div className="space-y-5 animate-fadeIn">
             <h2 className="text-2xl font-black text-center text-white">Finalize your motivation alert</h2>
 
+            {/* What the button below is about to create */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center space-y-1">
+              <div className="text-[10px] uppercase tracking-widest font-black text-slate-500">
+                Your alarm
+              </div>
+              <div className="text-2xl font-black text-white font-mono">
+                {firstAlarmPreview.time} {firstAlarmPreview.period.toUpperCase()}
+              </div>
+              <div className="text-[11px] font-semibold text-slate-400">
+                Weekdays · {selectedMission === 'none' ? 'Dismiss button only' : missionNames[selectedMission] || selectedMission} ·{' '}
+                {RINGTONES_CATALOG.find((tone) => tone.id === selectedAudio)?.title || selectedAudio}
+              </div>
+            </div>
+
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-5">
               {/* Volume Slider */}
               <div className="space-y-2">
@@ -477,6 +561,37 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
                 <span>{isPlayingAudio ? 'Stop Preview' : '▶ Preview'}</span>
               </button>
             </div>
+
+            {/* Android asks for these itself; a browser never shows this card */}
+            {permissionsMissing && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+                <div className="text-xs font-bold text-amber-300">
+                  One more thing - so this alarm really rings with the phone locked
+                </div>
+                {permissions && !permissions.notificationsAllowed && (
+                  <button
+                    id="btn-onboarding-allow-notifications"
+                    type="button"
+                    disabled={permissionBusy}
+                    onClick={() => void askForNotifications()}
+                    className="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs transition active:scale-95 disabled:opacity-60"
+                  >
+                    Allow notifications
+                  </button>
+                )}
+                {permissions && !permissions.exactAlarmsAllowed && (
+                  <button
+                    id="btn-onboarding-allow-exact-alarms"
+                    type="button"
+                    disabled={permissionBusy}
+                    onClick={() => void askForExactAlarms()}
+                    className="w-full py-2.5 rounded-xl bg-slate-900 text-amber-300 border border-amber-500/40 font-bold text-xs transition active:scale-95 disabled:opacity-60"
+                  >
+                    Allow exact alarms
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -505,7 +620,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
         >
           <span>
             {step === 3
-              ? 'Set and Go'
+              ? mandatory
+                ? 'Set my alarm'
+                : 'Set alarm & close'
               : 'Next'}
           </span>
           <ChevronRight className="w-5 h-5 stroke-[2.5]" />

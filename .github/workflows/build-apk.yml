@@ -134,6 +134,22 @@ jobs:
               print('::error::No native unit tests ran - check android/app/src/test')
               sys.exit(1)
           print(f'::notice::Native unit tests: {tests} run, {failures} failed, {errors} errors, {skipped} skipped ({len(files)} classes)')
+          # A failing JVM test is only a count in the log; name the failing cases so the run page
+          # says which assertion broke without downloading anything.
+          shown = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              for case in root.iter('testcase'):
+                  bad = [c for c in case if c.tag in ('failure', 'error')]
+                  if not bad:
+                      continue
+                  message = ' '.join((bad[0].get('message') or bad[0].text or '').split())
+                  cls = case.get('classname', '').split('.')[-1]
+                  if shown < 25:
+                      print(f'::error::FAILED {cls}.{case.get("name")} - {message[:220]}')
+                  shown += 1
+          if shown > 25:
+              print(f'::error::...and {shown - 25} more failing tests')
           sys.exit(1 if failures or errors else 0)
           PY
 

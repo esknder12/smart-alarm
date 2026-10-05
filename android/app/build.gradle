@@ -62,6 +62,10 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // Used directly by the ringing alarm: NotificationCompat / ServiceCompat / ContextCompat /
+    // NotificationManagerCompat. Capacitor depends on androidx.core with `implementation`, so it
+    // would not be on this module's compile classpath on its own.
+    implementation "androidx.core:core:$androidxCoreVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

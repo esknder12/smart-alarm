@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption, RINGTONES_CATALOG, SoundCategory } from '../types';
+import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption } from '../types';
 import { Language, translations } from '../utils/translations';
-import { audioEngine } from '../utils/audio';
-import { Plus, Trash2, Volume2, Bell, Clock, Edit2, Play, Square, Shield, Sparkles, Image, Flame, Radio, ChevronRight, Music, Sliders, Calendar, Zap, X, BellRing } from 'lucide-react';
+import { Plus, Trash2, Bell, Edit2, Calendar, Zap, X, Check } from 'lucide-react';
 import { RingtonePickerModal } from './RingtonePickerModal';
 import { QuickAlarmModal } from './QuickAlarmModal';
+import AlarmEditorModal from './AlarmEditorModal';
 import { HabitAlarmWizardModal } from './HabitAlarmWizardModal';
 import { MorningInspiration } from './MorningInspiration';
 import { getNotificationStatus, requestNotificationPermission, NotificationStatus } from '../utils/notifications';
@@ -17,9 +17,9 @@ interface AlarmClockProps {
   onDeleteAlarm: (id: string) => void;
   nextAlarmTime: string | null;
   language?: Language;
+  /** Id of a newly created alarm: its card is rung for a few seconds so the user sees it landed. */
+  highlightAlarmId?: string | null;
 }
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const WALLPAPERS: WallpaperOption[] = [
   { id: 'default', name: 'Cosmic Dark', category: 'Trending', bgGradient: 'bg-[#18191d]' },
@@ -36,7 +36,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   onDeleteAlarm,
   nextAlarmTime,
   language = 'en',
-}) => {
+  highlightAlarmId = null,
+}: AlarmClockProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
 
@@ -111,8 +112,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     });
   };
 
-  // Preview Sound & Ringtone Picker State
-  const [playingSound, setPlayingSound] = useState<SoundType | null>(null);
+  // Ringtone picker state
   const [isRingtonePickerOpen, setIsRingtonePickerOpen] = useState(false);
 
   const openAddModal = () => {
@@ -151,8 +151,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (editingAlarm) {
       onUpdateAlarm({
         ...editingAlarm,
@@ -180,25 +179,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         challengeDifficulty,
       });
     }
-    stopPreview();
     setIsModalOpen(false);
-  };
-
-  const toggleSoundPreview = (selectedSound: SoundType) => {
-    if (playingSound === selectedSound) {
-      audioEngine.stopAlarmSound();
-      setPlayingSound(null);
-    } else {
-      audioEngine.startAlarmSound(selectedSound, volume, false);
-      setPlayingSound(selectedSound);
-    }
-  };
-
-  const stopPreview = () => {
-    if (playingSound) {
-      audioEngine.stopAlarmSound();
-      setPlayingSound(null);
-    }
   };
 
   return (
@@ -226,6 +207,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
       <div className="space-y-4 pb-20">
         {alarms.map((alarm) => {
           const isEnabled = alarm.enabled;
+          const isNew = highlightAlarmId === alarm.id;
           // Format time to 12h am/pm format like 7:00 am
           const [hStr, mStr] = alarm.time.split(':');
           let h = parseInt(hStr, 10);
@@ -242,7 +224,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                 isEnabled
                   ? 'bg-[#1f2026] border-slate-700/80 shadow-2xl ring-1 ring-white/5'
                   : 'bg-[#141518]/60 border-slate-800/40 opacity-40'
-              }`}
+              } ${isNew ? 'ring-2 ring-emerald-400/70 shadow-emerald-500/20' : ''}`}
             >
               {/* Days indicator row S M T W T F S */}
               <div className="flex items-center space-x-2 text-xs font-black text-slate-500 mb-3 tracking-widest">
@@ -257,6 +239,15 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
                     </span>
                   );
                 })}
+                {isNew && (
+                  <span
+                    id={`alarm-just-set-${alarm.id}`}
+                    className="ml-auto flex items-center space-x-1 text-[10px] font-black uppercase tracking-wider text-emerald-300"
+                  >
+                    <Check className="w-3 h-3 stroke-[3]" />
+                    <span>Set</span>
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
@@ -410,189 +401,24 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         </button>
       </div>
 
-      {/* Add / Edit Alarm Modal */}
-      {isModalOpen && (
-        <div id="alarm-edit-modal-backdrop" className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#18191d] border border-slate-800 rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800/80">
-              <h3 className="text-xl font-black text-white tracking-tight">
-                {editingAlarm ? 'Edit Alarm' : 'Set New Alarm'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  stopPreview();
-                  setIsModalOpen(false);
-                }}
-                className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Time Selection */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                  Alarm Time (24H)
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-3xl font-mono font-bold text-center text-amber-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition shadow-inner"
-                  required
-                />
-              </div>
-
-              {/* Label */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                  Alarm Label
-                </label>
-                <input
-                  type="text"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder="e.g. Daily Motivation Alert"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-slate-700 transition"
-                />
-              </div>
-
-              {/* Repeat Days */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                  Repeat Days
-                </label>
-                <div className="flex justify-between gap-1.5">
-                  {DAYS.map((day, idx) => {
-                    const selected = repeatDays.includes(idx);
-                    return (
-                      <button
-                        type="button"
-                        key={day}
-                        onClick={() => toggleDay(idx)}
-                        className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${
-                          selected
-                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105'
-                            : 'bg-slate-950 text-slate-400 border border-slate-800/80 hover:border-slate-700 hover:text-slate-200'
-                        }`}
-                      >
-                        {day[0]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sound Selector with Android Ringtone Picker Trigger */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
-                    Alarm Sound Tone
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => toggleSoundPreview(sound)}
-                    className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center space-x-1.5 transition"
-                  >
-                    {playingSound === sound ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{playingSound === sound ? 'Stop Test' : 'Test Tone'}</span>
-                  </button>
-                </div>
-
-                {/* Ringtone Picker Launch Card */}
-                {(() => {
-                  const currentRingtone = RINGTONES_CATALOG.find((r) => r.id === sound) || {
-                    emoji: '🎵',
-                    title: sound,
-                    subtitle: 'Selected Tone',
-                  };
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => setIsRingtonePickerOpen(true)}
-                      className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between transition text-left group"
-                    >
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-white flex items-center justify-center text-lg shrink-0">
-                          {currentRingtone.emoji}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-bold text-white truncate group-hover:text-slate-200 transition">
-                            {currentRingtone.title}
-                          </div>
-                          <div className="text-xs text-slate-400 truncate">
-                            {currentRingtone.subtitle}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1.5 bg-slate-800 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700 shrink-0">
-                        <Music className="w-3.5 h-3.5 text-white" />
-                        <span>Browse Picker</span>
-                      </div>
-                    </button>
-                  );
-                })()}
-              </div>
-
-              {/* Target Volume Slider */}
-              <div>
-                <div className="flex justify-between text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                  <span>Target Volume</span>
-                  <span className="font-mono text-amber-400">{volume}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full accent-amber-500 bg-slate-950 h-2 rounded-lg cursor-pointer"
-                />
-              </div>
-
-              {/* Wake Up Challenge Option */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                  Wake-Up Challenge (Required to Stop Alarm)
-                </label>
-                <select
-                  value={challenge}
-                  onChange={(e) => setChallenge(e.target.value as ChallengeType)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-sm font-semibold text-white focus:outline-none focus:border-slate-700 transition"
-                >
-                  <option value="none">None (Standard Dismiss Button)</option>
-                  <option value="math">Math Equations (Solves Morning Brain Fog)</option>
-                  <option value="shake">Physical Phone Shake Challenge</option>
-                  <option value="tiles">Color Memory Tile Pattern</option>
-                  <option value="typing">Morning Affirmation Typing</option>
-                </select>
-              </div>
-
-              {/* Form Action Buttons */}
-              <div className="flex space-x-3 pt-3 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopPreview();
-                    setIsModalOpen(false);
-                  }}
-                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold py-3.5 rounded-2xl transition text-sm border border-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 rounded-2xl transition text-sm shadow-lg shadow-amber-500/20 active:scale-95"
-                >
-                  Save Alarm
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add / Edit Alarm Modal - kept as short as the phone's own alarm dialog */}
+      <AlarmEditorModal
+        isOpen={isModalOpen}
+        editingAlarm={editingAlarm}
+        language={language}
+        time={time}
+        onTimeChange={setTime}
+        label={label}
+        onLabelChange={setLabel}
+        repeatDays={repeatDays}
+        onToggleDay={toggleDay}
+        sound={sound}
+        onBrowseSound={() => setIsRingtonePickerOpen(true)}
+        challenge={challenge}
+        onChallengeChange={setChallenge}
+        onCancel={() => setIsModalOpen(false)}
+        onSave={handleSubmit}
+      />
 
       {/* Android Ringtone Picker Modal */}
       <RingtonePickerModal
