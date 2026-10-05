@@ -4,4 +4,11 @@
     <string name="title_activity_main">Niqu ንቁ</string>
     <string name="package_name">com.esknder.niqu</string>
     <string name="custom_url_scheme">com.esknder.niqu</string>
+
+    <!-- Ringing alarm (foreground service notification) -->
+    <string name="alarm_channel_name">Ringing alarm</string>
+    <string name="alarm_channel_description">Shown while an alarm is ringing. The alarm sound itself plays on the phone\'s alarm audio stream.</string>
+    <string name="alarm_notification_title">%1$s · %2$s</string>
+    <string name="alarm_notification_default_label">Alarm</string>
+    <string name="alarm_notification_text">Solve the mission to switch the alarm off · ለማጥፋት ፈተናውን ይፍቱ</string>
 </resources>

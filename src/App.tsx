@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TabType, Alarm, RoutineStep, WakeLog, AmbientSound } from './types';
 import { Language, translations } from './utils/translations';
@@ -14,6 +14,11 @@ import {
   loadAmbients,
   saveAmbients,
 } from './utils/storage';
+import {
+  nativeAlarmScheduler,
+  alarmFromRingInfo,
+  type RingingAlarmInfo,
+} from './utils/alarmScheduler';
 import { Navbar } from './components/Navbar';
 import { AlarmClock } from './components/AlarmClock';
 import { AlarmRingingModal } from './components/AlarmRingingModal';
@@ -57,6 +62,50 @@ export default function App() {
   useEffect(() => saveRoutine(routine), [routine]);
   useEffect(() => saveLogs(logs), [logs]);
   useEffect(() => saveAmbients(ambients), [ambients]);
+
+  // --- Native alarm engine (Android app only) -------------------------------
+  // The JS timer below only ticks while this page is alive. On a phone the alarms are mirrored
+  // into AlarmManager by the AlarmScheduler plugin, so they ring with the app closed; this effect
+  // keeps that mirror in step with the alarm list, and opens the puzzle when the ringing service
+  // says an alarm is firing - including a cold start from its full-screen notification.
+  const alarmsRef = useRef(alarms);
+  useEffect(() => {
+    alarmsRef.current = alarms;
+  }, [alarms]);
+
+  useEffect(() => {
+    void nativeAlarmScheduler.sync(alarms);
+  }, [alarms]);
+
+  const openNativeRing = useCallback((info: RingingAlarmInfo) => {
+    const alarm = alarmFromRingInfo(info, alarmsRef.current);
+    // Stop the once-a-minute JS checker from "discovering" the same alarm a second time.
+    setLastTriggeredTime(alarm.time);
+    setRingingAlarm(alarm);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribes: Array<() => void> = [];
+    void (async () => {
+      const offTriggered = await nativeAlarmScheduler.onAlarmTriggered((info) => openNativeRing(info));
+      const offStopped = await nativeAlarmScheduler.onRingStopped(() => setRingingAlarm(null));
+      if (cancelled) {
+        offTriggered();
+        offStopped();
+        return;
+      }
+      unsubscribes.push(offTriggered, offStopped);
+      // Cold start: the activity may have been launched by the full-screen notification while the
+      // service was already ringing (screen off, app closed, lockscreen up).
+      const state = await nativeAlarmScheduler.getState();
+      if (!cancelled && state.ringing) openNativeRing(state.ringing);
+    })();
+    return () => {
+      cancelled = true;
+      unsubscribes.forEach((off) => off());
+    };
+  }, [openNativeRing]);
 
   // Global Alarm Checker Loop (runs every second)
   useEffect(() => {
@@ -178,10 +227,20 @@ export default function App() {
 
     setAlarms([...alarms, snoozedAlarm]);
     setRingingAlarm(null);
+    // The ringing service knows nothing about snoozing: end its ring (the snoozed alarm is armed
+    // by the sync above, because it becomes part of the alarm list).
+    void nativeAlarmScheduler.stopRing();
   };
 
-  // Automatic Launch on Open: render onboarding tour first before dashboard
-  if (showTour) {
+  // Dismiss = puzzle solved: stop the ring in both worlds, then close the screen.
+  const handleDismissRing = () => {
+    setRingingAlarm(null);
+    void nativeAlarmScheduler.stopRing();
+  };
+
+  // Automatic Launch on Open: render onboarding tour first before dashboard.
+  // A ringing alarm always wins: the phone may have been opened by its notification.
+  if (showTour && !ringingAlarm) {
     return (
       <OnboardingTour
         onComplete={(newAlarm) => {
@@ -288,7 +347,7 @@ export default function App() {
       {ringingAlarm && (
         <AlarmRingingModal
           alarm={ringingAlarm}
-          onDismiss={() => setRingingAlarm(null)}
+          onDismiss={handleDismissRing}
           onSnooze={handleSnooze}
           language={language}
         />

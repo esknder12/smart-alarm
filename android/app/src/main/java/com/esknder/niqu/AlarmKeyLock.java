@@ -9,11 +9,19 @@ import android.view.KeyEvent;
  * Android can act on them. The alarm therefore cannot be turned down, muted or dismissed with a
  * button - the only way out is the in-app puzzle, which ends with the web layer releasing the lock.
  *
- * <p><b>The lock is a lease, not a switch.</b> {@link #engage(long)} arms it for a short time and
- * the web layer keeps renewing it for as long as the alarm rings. If the renewals stop for any
- * reason (page reload, WebView crash, a JavaScript error that skips the release) the lease simply
- * lapses and the buttons come back by themselves. A stuck lock that leaves the phone's buttons dead
- * is therefore impossible by construction.
+ * <p><b>The lock has two reasons to be held.</b>
+ * <ol>
+ *   <li>A <b>lease</b> ({@link #engage(long)}): the web layer arms it for a short time and keeps
+ *       renewing it while the alarm rings. If the renewals stop - page reload, WebView crash, a
+ *       JavaScript error that skips the release - the lease simply lapses and the buttons come
+ *       back by themselves. A stuck lock that leaves the phone's buttons dead is therefore
+ *       impossible by construction.</li>
+ *   <li>A <b>ringing session</b> ({@link RingSource}): since Phase 2 the alarm is owned by
+ *       {@code AlarmRingService}, which rings whether or not the WebView is alive. While that
+ *       service is ringing, the keys stay swallowed even if the page never engaged the lease -
+ *       "tie the volume-key block to the service". The web lease still runs on top of it, so the
+ *       page's own state (pending / locked / failed) keeps meaning what it did before.</li>
+ * </ol>
  *
  * <p>This class deliberately makes no Android framework calls - it only reads compile-time
  * key-code constants - so it can be unit-tested on the plain JVM (see {@code AlarmKeyLockTest}).
@@ -25,6 +33,15 @@ final class AlarmKeyLock {
     /** Monotonic millisecond clock ({@code SystemClock.elapsedRealtime} on a device). */
     interface Clock {
         long now();
+    }
+
+    /**
+     * Something outside the web layer - in practice {@link RingSession}, fed by
+     * {@code AlarmRingService} - that knows an alarm is ringing right now.
+     */
+    interface RingSource {
+        /** Must be cheap and non-blocking: it is called from the key-event path. */
+        boolean isAlarmRinging();
     }
 
     /** Told whenever the lock flips between engaged and released (including lease expiry). */
@@ -41,11 +58,18 @@ final class AlarmKeyLock {
     static final long DEFAULT_LEASE_MS = 8_000L;
     static final long MAX_LEASE_MS = 60_000L;
 
+    /** Pending listener notifications, emitted in this order. */
+    private static final int EV_NONE = 0;
+    private static final int EV_RELEASED = 1;
+    private static final int EV_LOCKED = 2;
+
     private final Clock clock;
 
     private StateListener stateListener; // guarded by this
     private KeyListener keyListener; // guarded by this
-    private boolean engaged; // guarded by this
+    private RingSource ringSource; // guarded by this
+    private boolean engaged; // guarded by this - the web layer's lease
+    private boolean ringActive; // guarded by this - the service's ringing session
     private long leaseEndsAt; // guarded by this
     private int blockedPresses; // guarded by this
 
@@ -71,63 +95,76 @@ final class AlarmKeyLock {
     }
 
     /**
-     * Arms the lock for {@code requestedLeaseMs} (clamped to the allowed range) from now. Calling
+     * Attaches the source of truth for "an alarm is ringing natively". Passing null (or a source
+     * that reports false) restores the Phase 1 behaviour, where only the web lease holds the lock.
+     */
+    void setRingSource(RingSource source) {
+        int events;
+        StateListener listener;
+        synchronized (this) {
+            this.ringSource = source;
+            events = advanceLocked(clock.now());
+            listener = stateListener;
+        }
+        emit(listener, events);
+    }
+
+    /**
+     * Arms the lease for {@code requestedLeaseMs} (clamped to the allowed range) from now. Calling
      * it again while engaged renews the lease and is how the web layer keeps the lock alive.
      */
     void engage(long requestedLeaseMs) {
         long lease = Math.max(MIN_LEASE_MS, Math.min(MAX_LEASE_MS, requestedLeaseMs));
-        boolean expired;
-        boolean changed;
+        int events;
         StateListener listener;
         synchronized (this) {
             long now = clock.now();
-            expired = expireLocked(now);
-            changed = !engaged;
-            if (changed) {
+            events = advanceLocked(now);
+            boolean wasLive = lockedLocked();
+            if (!engaged) {
                 blockedPresses = 0;
             }
             engaged = true;
             leaseEndsAt = now + lease;
+            if (!wasLive && lockedLocked()) {
+                events |= EV_LOCKED;
+            }
             listener = stateListener;
         }
-        if (listener != null) {
-            if (expired) {
-                listener.onLockChanged(false);
-            }
-            if (changed) {
-                listener.onLockChanged(true);
-            }
-        }
+        emit(listener, events);
     }
 
-    /** Releases the lock immediately. Safe to call when it is not engaged. */
+    /** Releases the lease immediately. Safe to call when it is not engaged. */
     void release() {
-        boolean wasEngaged;
+        int events;
         StateListener listener;
         synchronized (this) {
-            wasEngaged = engaged;
+            events = advanceLocked(clock.now());
+            boolean wasLive = lockedLocked();
             engaged = false;
             leaseEndsAt = 0L;
+            if (wasLive && !lockedLocked()) {
+                events |= EV_RELEASED;
+            }
             listener = stateListener;
         }
-        if (wasEngaged && listener != null) {
-            listener.onLockChanged(false);
-        }
+        emit(listener, events);
     }
 
-    /** True while the lease is live. Also what turns an elapsed lease into a release. */
+    /**
+     * True while either reason holds the lock. Also what turns an elapsed lease - and a service
+     * that has stopped ringing - into a release.
+     */
     boolean isEngaged() {
-        boolean expired;
+        int events;
         boolean result;
         StateListener listener;
         synchronized (this) {
-            expired = expireLocked(clock.now());
-            result = engaged;
+            events = advanceLocked(clock.now());
+            result = lockedLocked();
             listener = stateListener;
         }
-        if (expired && listener != null) {
-            listener.onLockChanged(false);
-        }
+        emit(listener, events);
         return result;
     }
 
@@ -157,21 +194,26 @@ final class AlarmKeyLock {
         return blockedPresses;
     }
 
-    /** Milliseconds until the lease lapses; 0 when the lock is not engaged. */
+    /** Milliseconds until the lease lapses; 0 when no lease is held. */
     synchronized long getLeaseRemainingMs() {
         return engaged ? Math.max(0L, leaseEndsAt - clock.now()) : 0L;
     }
 
+    /** True while the ringing service (rather than the web lease) is holding the lock. */
+    synchronized boolean isRingLockActive() {
+        return ringActive;
+    }
+
     private boolean consumeIfEngaged(int keyCode, boolean countsAsPress) {
-        boolean expired;
+        int events;
         boolean consume;
         boolean counted = false;
         int presses = 0;
         StateListener stateCallback;
         KeyListener keyCallback;
         synchronized (this) {
-            expired = expireLocked(clock.now());
-            consume = engaged;
+            events = advanceLocked(clock.now());
+            consume = lockedLocked();
             if (consume && countsAsPress) {
                 blockedPresses++;
                 presses = blockedPresses;
@@ -180,13 +222,48 @@ final class AlarmKeyLock {
             stateCallback = stateListener;
             keyCallback = keyListener;
         }
-        if (expired && stateCallback != null) {
-            stateCallback.onLockChanged(false);
-        }
+        emit(stateCallback, events);
         if (counted && keyCallback != null) {
             keyCallback.onKeyBlocked(keyCode, presses);
         }
         return consume;
+    }
+
+    /** Must be called with the monitor held. */
+    private boolean lockedLocked() {
+        return engaged || ringActive;
+    }
+
+    /**
+     * Applies lease expiry and re-reads the ring source, in one place, for every entry point.
+     *
+     * <p>Must be called with the monitor held.
+     *
+     * @return the listener events this state change owes, as an {@code EV_*} bit mask.
+     */
+    private int advanceLocked(long now) {
+        int events = EV_NONE;
+        // Read the ring source first: if the alarm started ringing and the web lease ran out in the
+        // very same call, the keys must stay locked and no release may be reported.
+        RingSource source = ringSource;
+        boolean ringsNow = source != null && source.isAlarmRinging();
+        if (ringsNow != ringActive) {
+            ringActive = ringsNow;
+            if (ringsNow) {
+                blockedPresses = 0; // a new alarm, a fresh count
+            }
+        }
+        boolean wasLive = lockedLocked();
+        if (expireLocked(now) && !lockedLocked()) {
+            events |= EV_RELEASED;
+        }
+        boolean isLive = lockedLocked();
+        if (isLive && !wasLive) {
+            events |= EV_LOCKED;
+        } else if (!isLive && wasLive) {
+            events |= EV_RELEASED;
+        }
+        return events;
     }
 
     /** Must be called with the monitor held. @return true if the lease just ran out. */
@@ -197,5 +274,11 @@ final class AlarmKeyLock {
             return true;
         }
         return false;
+    }
+
+    private static void emit(StateListener listener, int events) {
+        if (listener == null || events == EV_NONE) return;
+        if ((events & EV_RELEASED) != 0) listener.onLockChanged(false);
+        if ((events & EV_LOCKED) != 0) listener.onLockChanged(true);
     }
 }

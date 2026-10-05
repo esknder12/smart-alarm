@@ -31,6 +31,7 @@ import {
 import { Language, translations } from '../utils/translations';
 import { APP_NAME, APP_VERSION } from '../constants';
 import { nativeAlarmLock } from '../utils/alarmLock';
+import { WakeUpReliabilityModal } from './WakeUpReliabilityModal';
 import {
   getNotificationStatus,
   requestNotificationPermission,
@@ -195,6 +196,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
             <span className="text-xs font-mono text-emerald-400">
               • {isAm ? 'ሁልጊዜ በራ' : 'ALWAYS ON'}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+        </button>
+
+        {/* Row 6: Wake-up reliability (exact alarms, notifications, full-screen intent) */}
+        <button
+          onClick={() => setActiveModal('reliability')}
+          className="w-full p-3.5 flex items-center justify-between hover:bg-slate-800/40 rounded-2xl transition"
+        >
+          <div className="flex items-center space-x-3.5">
+            <div className="w-5 h-5 text-cyan-400 flex items-center justify-center">
+              <BellRing className="w-5 h-5" />
+            </div>
+            <span className="font-bold text-sm text-slate-100">
+              {isAm ? 'ማንቂያው በእርግጥ ይደውላል?' : 'Wake-Up Reliability'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-1 text-sm text-slate-400 font-medium">
+            <span className="text-xs font-mono">
+              • {nativeLock ? (isAm ? 'ከመተግበሪያው ውጭም' : 'CLOSED APP') : (isAm ? 'አሳሽ' : 'BROWSER')}
             </span>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
@@ -468,6 +490,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               )}
 
+              {/* Wake-up reliability: exact alarms, notifications, full-screen intent */}
+              {activeModal === 'reliability' && (
+                <WakeUpReliabilityModal language={language} onClose={() => setActiveModal(null)} />
+              )}
+
               {/* Strict Volume Lock Modal */}
               {activeModal === 'volume_lock' && (
                 <div className="space-y-4 text-xs">
@@ -480,8 +507,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <p className="text-slate-300 mt-1 leading-relaxed">
                         {nativeLock
                           ? (isAm
-                              ? 'ማንቂያው ሲደውል የስልኩ የድምፅ መቀነሻ፣ መጨመሪያ እና የዝምታ ቁልፎች እንዲሁም ተመለስ ቁልፍ አይሰሩም፣ ስክሪኑም ብርሃኑን አይቀንስም። ለማጥፋት ፈተናውን መፍታት ግዴታ ነው።'
-                              : 'While the alarm rings, the phone\'s volume-down, volume-up and mute buttons and the Back button do nothing, and the screen stays on. The only way to switch the alarm off is to solve the mission.')
+                              ? 'ማንቂያው ሲደውል የስልኩ የድምፅ መቀነሻ፣ መጨመሪያ እና የዝምታ ቁልፎች እንዲሁም ተመለስ ቁልፍ አይሰሩም፣ ስክሪኑም ብርሃኑን አይቀንስም። መቆለፊያው ደውሎ ባለው አገልግሎት ስለሚያዝ መተግበሪያው ተዘግቶ ቢጀምርም ይሠራል። ለማጥፋት ፈተናውን መፍታት ግዴታ ነው።'
+                              : 'While the alarm rings, the phone\'s volume-down, volume-up and mute buttons and the Back button do nothing, and the screen stays on. The block is held by the ringing service itself, so it also holds when the alarm was started with the app closed. The only way to switch the alarm off is to solve the mission.')
                           : (isAm
                               ? 'ማንቂያው ሲደውል የድምፅ መቀነሻ እና የዝምታ ቁልፎች ተይዘው አይሰሩም። ድምፅ መቀነስ ከሞከሩ ማንቂያው ይበልጥ ይጮሃል።'
                               : 'While the alarm rings, volume-down and mute keys are swallowed and ignored. Trying to turn the alarm down makes it louder instead.')}
@@ -726,7 +753,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
 
               {/* Generic fallback for FAQ, Notices, Feedback, Advanced, Optimization */}
-              {!['account', 'pro', 'theme', 'sound_output', 'system_config', 'notifications', 'about'].includes(activeModal) && (
+              {!['account', 'pro', 'theme', 'sound_output', 'system_config', 'notifications', 'about', 'reliability', 'volume_lock'].includes(activeModal) && (
                 <div className="space-y-3 text-xs text-slate-300">
                   <p>Configuration updated successfully for {activeModal.replace('_', ' ')}.</p>
                   <button

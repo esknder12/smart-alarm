@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Alarm, ChallengeType } from '../types';
 import { audioEngine } from '../utils/audio';
@@ -9,6 +9,7 @@ import {
   HardwareKeysState,
   VOLUME_LOCK_BLOCKED_EVENT,
 } from '../utils/volumeLock';
+import { nativeAlarmScheduler } from '../utils/alarmScheduler';
 import { WALLPAPERS } from './AlarmClock';
 import { Language } from '../utils/translations';
 import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX } from 'lucide-react';
@@ -150,6 +151,50 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
       volumeLock.disengage();
     };
   }, [alarm.id, alarm.volume]);
+
+  /**
+   * Phase 2 sound hand-off.
+   *
+   * When the ring came from the Android service (alarm fired while the app was closed), the phone
+   * is already playing its own alarm tone on the alarm stream. This screen plays the user's chosen
+   * theme through Web Audio instead, so as soon as that is really running the native tone is
+   * silenced - never before it, so an alarm is never left silent. In a browser this whole effect is
+   * skipped (there is no native engine to hand over from).
+   */
+  const tookOverNativeAudio = useRef(false);
+  useEffect(() => {
+    if (!nativeAlarmScheduler.isAvailable()) return;
+    let retry: number | null = null;
+    const takeOver = () => {
+      if (!audioEngine.forceLoud()) {
+        // Still suspended (no user gesture yet) - the native tone keeps ringing. Try once more.
+        if (retry === null) retry = window.setTimeout(takeOver, 300);
+        return;
+      }
+      if (tookOverNativeAudio.current) return;
+      tookOverNativeAudio.current = true;
+      void nativeAlarmScheduler.takeOverRing();
+    };
+    // Coming back to the app after it was in the background: the service rang natively again (it
+    // must, the WebView is silenced there), so hand the sound back over.
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      tookOverNativeAudio.current = false;
+      takeOver();
+    };
+    takeOver();
+    window.addEventListener('pointerdown', takeOver, true);
+    window.addEventListener('touchstart', takeOver, true);
+    window.addEventListener('keydown', takeOver, true);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pointerdown', takeOver, true);
+      window.removeEventListener('touchstart', takeOver, true);
+      window.removeEventListener('keydown', takeOver, true);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (retry !== null) window.clearTimeout(retry);
+    };
+  }, [alarm.id]);
 
   // Auto-hide the "volume locked" toast after a few seconds
   useEffect(() => {

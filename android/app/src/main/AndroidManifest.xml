@@ -9,12 +9,19 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!--
+            showWhenLocked + turnScreenOn: the alarm's full-screen notification brings this activity
+            up over the keyguard, turns the screen on and shows the puzzle. MainActivity also sets
+            these at runtime for Android 7.x, where the attributes do not exist.
+        -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:exported="true">
 
             <intent-filter>
@@ -23,6 +30,41 @@
             </intent-filter>
 
         </activity>
+
+        <!--
+            The alarm itself: a foreground service that rings (audio on the alarm stream, vibration,
+            escalation) whether or not the app is open, and holds the volume-key block through
+            RingSession while it does. stopWithTask=false: swiping the app away must not silence a
+            ringing alarm.
+        -->
+        <service
+            android:name=".AlarmRingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false" />
+
+        <!-- Fired by AlarmManager; starts the ringing service. -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.esknder.niqu.action.ALARM_FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Re-arms every alarm after a reboot, an app update or a clock/time-zone change. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:directBootAware="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -38,4 +80,27 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Ringing while the app is closed -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!--
+        Exact alarms. USE_EXACT_ALARM is granted at install to genuine alarm-clock apps (API 33+);
+        on Android 12 an app has to be granted SCHEDULE_EXACT_ALARM by the user, which the in-app
+        "Wake-Up Reliability" panel offers. If neither is granted the app still alarms, just not to
+        the minute, and says so in the UI.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+
+    <!-- The alarm takes the screen over the lock screen (Android 14+ gates this behind a toggle). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 </manifest>
