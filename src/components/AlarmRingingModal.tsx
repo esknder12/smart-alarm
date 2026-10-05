@@ -36,6 +36,34 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
   const [mathProblem, setMathProblem] = useState<{ question: string; answer: number }>({ question: '', answer: 0 });
   const [userMathInput, setUserMathInput] = useState<string>('');
   const [mathError, setMathError] = useState<boolean>(false);
+  const ringingPanelRef = useRef<HTMLDivElement>(null);
+
+  // Android's keyboard can shrink the visual viewport without changing the WebView's layout
+  // viewport. Track it so the challenge panel remains scrollable above the keyboard.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateViewport = () => {
+      document.documentElement.style.setProperty('--ringing-viewport-height', `${viewport.height}px`);
+      document.documentElement.style.setProperty('--ringing-viewport-top', `${viewport.offsetTop}px`);
+    };
+    updateViewport();
+    viewport.addEventListener('resize', updateViewport);
+    viewport.addEventListener('scroll', updateViewport);
+    return () => {
+      viewport.removeEventListener('resize', updateViewport);
+      viewport.removeEventListener('scroll', updateViewport);
+      document.documentElement.style.removeProperty('--ringing-viewport-height');
+      document.documentElement.style.removeProperty('--ringing-viewport-top');
+    };
+  }, []);
+
+  const keepFocusedFieldVisible = (event: React.FocusEvent<HTMLInputElement>) => {
+    const field = event.currentTarget;
+    window.setTimeout(() => {
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
+  };
 
   const [affirmation, setAffirmation] = useState<string>('');
   const [userTypingInput, setUserTypingInput] = useState<string>('');
@@ -364,14 +392,19 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
-        className={`fixed inset-0 z-50 bg-gradient-to-br ${activeWallpaper.bgGradient} backdrop-blur-xl flex items-center justify-center p-4 transition-all duration-700`}
+        style={{
+          top: 'var(--ringing-viewport-top, 0px)',
+          height: 'var(--ringing-viewport-height, 100dvh)',
+        }}
+        className={`fixed inset-x-0 z-50 bg-gradient-to-br ${activeWallpaper.bgGradient} backdrop-blur-xl flex items-start justify-center overflow-y-auto overscroll-contain p-3 sm:items-center sm:p-4 transition-all duration-700`}
       >
         <motion.div
           initial={{ scale: 0.85, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 10 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="max-w-md w-full bg-slate-900/90 border border-slate-700/60 rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden backdrop-blur-md"
+          ref={ringingPanelRef}
+          className="max-w-md w-full my-auto bg-slate-900/90 border border-slate-700/60 rounded-3xl p-4 sm:p-8 text-center shadow-2xl relative overflow-visible backdrop-blur-md"
         >
         {/* Animated Background Ring */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl animate-pulse pointer-events-none" />
@@ -557,6 +590,8 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                     {mathError && <p className="text-xs text-rose-400 font-medium">Incorrect answer, try this new equation!</p>}
                     <input
                       type="number"
+                      inputMode="numeric"
+                      onFocus={keepFocusedFieldVisible}
                       value={userMathInput}
                       onChange={(e) => setUserMathInput(e.target.value)}
                       placeholder="Type answer..."
@@ -603,6 +638,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                   </div>
                   <input
                     type="text"
+                    onFocus={keepFocusedFieldVisible}
                     value={userTypingInput}
                     onChange={handleTypingChange}
                     placeholder="Type affirmation here..."
