@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronRight,
-  Lock,
   Pencil,
   Play,
   Square,
   Volume2,
   X,
 } from 'lucide-react';
-import { Alarm, ChallengeType, RINGTONES_CATALOG, SoundType } from '../types';
+import { Alarm, ChallengeType, RINGTONES_CATALOG, SoundType, WallpaperId } from '../types';
 import { Language, translations } from '../utils/translations';
 import { audioEngine } from '../utils/audio';
 import { describeRepeat, nextOccurrence, shortDayName } from '../utils/alarmText';
@@ -32,6 +31,12 @@ export interface AlarmEditorScreenProps {
   onGentleWakeUpChange: (gentle: boolean) => void;
   challenge: ChallengeType;
   onChallengeChange: (challenge: ChallengeType) => void;
+  snoozeInterval?: number;
+  onSnoozeIntervalChange?: (interval: number) => void;
+  snoozeLimit?: number;
+  onSnoozeLimitChange?: (limit: number) => void;
+  wallpaper?: WallpaperId;
+  onWallpaperChange?: (wallpaper: WallpaperId) => void;
   canCancel: boolean;
   onCancel: () => void;
   onSave: () => void;
@@ -42,6 +47,18 @@ export interface TimeParts {
   minute: string;
   period: 'AM' | 'PM';
 }
+
+const HOURS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const PERIODS: ('AM' | 'PM')[] = ['AM', 'PM'];
+
+const WALLPAPER_CHOICES: { id: WallpaperId; name: string; nameAm: string; emoji: string; gradient: string }[] = [
+  { id: 'capybara', name: 'Capybara Beat', nameAm: 'ካፒባራ ጀምበር', emoji: '🐱', gradient: 'from-indigo-900 via-fuchsia-700 to-amber-300' },
+  { id: 'default', name: 'Cosmic Dark', nameAm: 'ጠፈር ጥቁር', emoji: '🌌', gradient: 'from-slate-900 via-purple-950 to-slate-900' },
+  { id: 'motivation', name: 'Daily Motivation', nameAm: 'የእለት ማነቃቂያ', emoji: '🌅', gradient: 'from-amber-700 via-orange-600 to-rose-700' },
+  { id: 'space', name: 'Deep Space', nameAm: 'ጥልቅ ጠፈር', emoji: '🪐', gradient: 'from-purple-900 via-indigo-950 to-slate-950' },
+  { id: 'nature', name: 'Misty Forest', nameAm: 'ደን እና ጤዛ', emoji: '🌲', gradient: 'from-emerald-900 via-teal-800 to-slate-900' },
+];
 
 export function getTimeParts(time: string): TimeParts {
   const [hourString, minuteString] = (time || '07:00').split(':');
@@ -109,11 +126,6 @@ function addMinutes(parts: TimeParts, delta: number): TimeParts {
   return next;
 }
 
-function formatWheelRow(parts: TimeParts) {
-  const period = parts.period === 'AM' ? 'a.m.' : 'p.m.';
-  return { hour: parts.hour, minute: parts.minute, period };
-}
-
 function ringSoonLabel(time: string, days: number[], language: Language): string {
   const when = nextOccurrence(time, days, new Date());
   const minutes = Math.max(0, Math.round((when.getTime() - Date.now()) / 60000));
@@ -127,6 +139,169 @@ function ringSoonLabel(time: string, days: number[], language: Language): string
   if (minutes < 60) return `Ring in ${minutes} minute${minutes === 1 ? '' : 's'}`;
   const hours = Math.round(minutes / 60);
   return `Ring in ${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
+interface WheelColumnProps<T extends string> {
+  items: T[];
+  selected: T;
+  onSelect: (item: T) => void;
+  displayFormat?: (item: T) => string;
+  ariaLabel: string;
+  itemHeight?: number;
+  className?: string;
+}
+
+function WheelColumn<T extends string>({
+  items,
+  selected,
+  onSelect,
+  displayFormat,
+  ariaLabel,
+  itemHeight = 56,
+  className = '',
+}: WheelColumnProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startScrollTopRef = useRef(0);
+
+  const selectedIndex = useMemo(() => {
+    const idx = items.indexOf(selected);
+    return idx >= 0 ? idx : 0;
+  }, [items, selected]);
+
+  // Sync scroll position when selected prop changes externally
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || isUserScrollingRef.current || isDraggingRef.current) return;
+    const targetTop = selectedIndex * itemHeight;
+    if (Math.abs(el.scrollTop - targetTop) > 1) {
+      el.scrollTo({ top: targetTop, behavior: 'smooth' });
+    }
+  }, [selectedIndex, itemHeight]);
+
+  // Initial scroll on mount without animation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.scrollTop = selectedIndex * itemHeight;
+  }, []);
+
+  const updateSelectionFromScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    const currentScrollTop = el.scrollTop;
+    const index = Math.min(items.length - 1, Math.max(0, Math.round(currentScrollTop / itemHeight)));
+    if (items[index] && items[index] !== selected) {
+      onSelect(items[index]);
+    }
+  };
+
+  const handleScroll = () => {
+    isUserScrollingRef.current = true;
+    updateSelectionFromScroll();
+
+    if (scrollDebounceRef.current) {
+      clearTimeout(scrollDebounceRef.current);
+    }
+    scrollDebounceRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+      const el = containerRef.current;
+      if (el) {
+        const target = Math.round(el.scrollTop / itemHeight) * itemHeight;
+        if (Math.abs(el.scrollTop - target) > 1) {
+          el.scrollTo({ top: target, behavior: 'smooth' });
+        }
+      }
+    }, 150);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const el = containerRef.current;
+    if (!el) return;
+    const direction = e.deltaY > 0 ? 1 : -1;
+    const nextIdx = Math.min(items.length - 1, Math.max(0, selectedIndex + direction));
+    if (nextIdx !== selectedIndex) {
+      onSelect(items[nextIdx]);
+      el.scrollTo({ top: nextIdx * itemHeight, behavior: 'smooth' });
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    startYRef.current = e.clientY;
+    startScrollTopRef.current = containerRef.current?.scrollTop || 0;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
+    const deltaY = e.clientY - startYRef.current;
+    containerRef.current.scrollTop = startScrollTopRef.current - deltaY;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    const el = containerRef.current;
+    if (el) {
+      const target = Math.round(el.scrollTop / itemHeight) * itemHeight;
+      el.scrollTo({ top: target, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUpOrLeave}
+      onMouseLeave={handleMouseUpOrLeave}
+      role="listbox"
+      aria-label={ariaLabel}
+      className={`h-[168px] overflow-y-auto overflow-x-hidden snap-y snap-mandatory select-none touch-pan-y overscroll-contain cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      style={{ scrollSnapType: 'y mandatory' }}
+    >
+      {/* Top spacer so index 0 is vertically centered in 168px container */}
+      <div style={{ height: itemHeight }} aria-hidden="true" className="shrink-0" />
+
+      {items.map((item, idx) => {
+        const isSelected = item === selected;
+        const dist = Math.abs(idx - selectedIndex);
+        return (
+          <div
+            key={item}
+            role="option"
+            aria-selected={isSelected}
+            onClick={() => {
+              onSelect(item);
+              containerRef.current?.scrollTo({ top: idx * itemHeight, behavior: 'smooth' });
+            }}
+            className={`flex items-center justify-center cursor-pointer snap-center shrink-0 transition-all duration-150 ${
+              isSelected
+                ? 'text-white text-[38px] font-normal scale-100 opacity-100'
+                : dist === 1
+                ? 'text-slate-500 text-[28px] font-light scale-95 opacity-60 hover:opacity-90'
+                : 'text-slate-600 text-[24px] font-light scale-90 opacity-25 hover:opacity-50'
+            }`}
+            style={{ height: itemHeight }}
+          >
+            <span className="tabular-nums tracking-tight">
+              {displayFormat ? displayFormat(item) : item}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* Bottom spacer so last index can be vertically centered */}
+      <div style={{ height: itemHeight }} aria-hidden="true" className="shrink-0" />
+    </div>
+  );
 }
 
 const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
@@ -146,6 +321,12 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   onGentleWakeUpChange,
   challenge,
   onChallengeChange,
+  snoozeInterval,
+  onSnoozeIntervalChange,
+  snoozeLimit,
+  onSnoozeLimitChange,
+  wallpaper,
+  onWallpaperChange,
   canCancel,
   onCancel,
   onSave,
@@ -157,10 +338,22 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [previewingSound, setPreviewingSound] = useState<SoundType | null>(null);
   const [vibrate, setVibrate] = useState(true);
-  const [timeReminder, setTimeReminder] = useState(false);
-  const [weatherReminder, setWeatherReminder] = useState(false);
   const [overlayAllowed, setOverlayAllowed] = useState(true);
   const native = nativeAlarmScheduler.isAvailable();
+
+  // Snooze & Wallpaper Modals
+  const [showSnoozeModal, setShowSnoozeModal] = useState(false);
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
+
+  const [internalSnoozeInterval, setInternalSnoozeInterval] = useState(snoozeInterval ?? 5);
+  const [internalSnoozeLimit, setInternalSnoozeLimit] = useState(snoozeLimit ?? 3);
+  const [internalWallpaper, setInternalWallpaper] = useState<WallpaperId>(wallpaper ?? 'capybara');
+
+  const activeSnoozeInterval = snoozeInterval !== undefined ? snoozeInterval : internalSnoozeInterval;
+  const activeSnoozeLimit = snoozeLimit !== undefined ? snoozeLimit : internalSnoozeLimit;
+  const activeWallpaper = wallpaper !== undefined ? wallpaper : internalWallpaper;
+
+  const currentWallpaperChoice = WALLPAPER_CHOICES.find((w) => w.id === activeWallpaper) || WALLPAPER_CHOICES[0];
 
   useEffect(() => () => audioEngine.stopAlarmSound(), []);
 
@@ -178,11 +371,31 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
     onTimeChange(to24HourTime(parts));
   };
 
-  const prevParts = addMinutes(timeParts, -61);
-  const nextParts = addMinutes(timeParts, 61);
-  const prevRow = formatWheelRow(prevParts);
-  const currentRow = formatWheelRow(timeParts);
-  const nextRow = formatWheelRow(nextParts);
+  const handleSnoozeApply = (newInterval: number, newLimit: number) => {
+    setInternalSnoozeInterval(newInterval);
+    setInternalSnoozeLimit(newLimit);
+    onSnoozeIntervalChange?.(newInterval);
+    onSnoozeLimitChange?.(newLimit);
+  };
+
+  const handleWallpaperApply = (wp: WallpaperId) => {
+    setInternalWallpaper(wp);
+    onWallpaperChange?.(wp);
+  };
+
+  const snoozeDisplayLabel = useMemo(() => {
+    if (activeSnoozeInterval === 0 || activeSnoozeLimit === 0) {
+      return amharic ? 'ጠፍቷል' : 'Off';
+    }
+    if (activeSnoozeLimit >= 99) {
+      return amharic
+        ? `${activeSnoozeInterval} ደቂቃ፣ ያልተገደበ`
+        : `${activeSnoozeInterval} min, continuous`;
+    }
+    return amharic
+      ? `${activeSnoozeInterval} ደቂቃ, ${activeSnoozeLimit} ጊዜ`
+      : `${activeSnoozeInterval} min, ${activeSnoozeLimit} times`;
+  }, [activeSnoozeInterval, activeSnoozeLimit, amharic]);
 
   const currentTone = RINGTONES_CATALOG.find((tone) => tone.id === sound);
   const soundTitle = currentTone?.title ?? sound;
@@ -318,23 +531,67 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
         <p className="mb-6 text-center text-[15px] text-slate-300">{ringLabel}</p>
 
-        <div className="mb-8 select-none" role="group" aria-label={t.alarmTimeLabel}>
-          <WheelRow parts={prevRow} muted onClick={() => commitTimeParts(prevParts)} />
-          <div className="my-1 rounded-[18px] bg-[#1c1c1e] px-6 py-4">
-            <WheelRow parts={currentRow} />
+        {/* Scrollable / Swipeable Time Wheel Picker */}
+        <div className="relative mb-8 select-none" role="group" aria-label={t.alarmTimeLabel}>
+          {/* Center highlight card background */}
+          <div className="pointer-events-none absolute inset-x-0 top-[56px] h-[56px] rounded-[18px] bg-[#1c1c1e] z-0 shadow-inner" />
+
+          {/* Gradient fades at top and bottom */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-[#0b0b0d] via-[#0b0b0d]/70 to-transparent z-20" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0b0b0d] via-[#0b0b0d]/70 to-transparent z-20" />
+
+          {/* Wheel Columns Container */}
+          <div className="relative z-10 flex items-center justify-center gap-1 sm:gap-2 px-2">
+            {/* Hour Wheel Column */}
+            <div className="w-20 sm:w-24">
+              <WheelColumn
+                items={HOURS}
+                selected={timeParts.hour}
+                onSelect={(hour) => commitTimeParts({ ...timeParts, hour })}
+                ariaLabel={amharic ? 'የሰዓት ቁጥር' : 'Alarm hour'}
+              />
+            </div>
+
+            {/* Separator Col */}
+            <div className="h-[168px] flex flex-col items-center justify-around py-2 z-10 pointer-events-none select-none">
+              <span className="text-[24px] font-light text-slate-600 opacity-50">:</span>
+              <span className="text-[36px] font-light text-white leading-none pb-1">:</span>
+              <span className="text-[24px] font-light text-slate-600 opacity-50">:</span>
+            </div>
+
+            {/* Minute Wheel Column */}
+            <div className="w-20 sm:w-24">
+              <WheelColumn
+                items={MINUTES}
+                selected={timeParts.minute}
+                onSelect={(minute) => commitTimeParts({ ...timeParts, minute })}
+                ariaLabel={amharic ? 'የደቂቃ ቁጥር' : 'Alarm minute'}
+              />
+            </div>
+
+            {/* Period (AM/PM) Wheel Column */}
+            <div className="w-20 sm:w-24">
+              <WheelColumn
+                items={PERIODS}
+                selected={timeParts.period}
+                onSelect={(period) => commitTimeParts({ ...timeParts, period })}
+                displayFormat={(p) => (p === 'AM' ? 'a.m.' : 'p.m.')}
+                ariaLabel="AM or PM"
+              />
+            </div>
           </div>
-          <WheelRow parts={nextRow} muted onClick={() => commitTimeParts(nextParts)} />
-          <div className="mt-3 flex justify-center gap-8 text-[11px] font-medium uppercase tracking-widest text-slate-600">
-            <button type="button" onClick={() => commitTimeParts(addMinutes(timeParts, -1))} aria-label={`Decrease ${amharic ? 'ደቂቃ' : 'Alarm minute'}`}>
-              −
-            </button>
+
+          {/* Accessible hidden inputs & AM/PM buttons for tests and accessibility */}
+          <div className="sr-only">
             <input
               id="alarm-hour-input"
               type="text"
               inputMode="numeric"
-              className="sr-only"
               value={timeParts.hour}
-              onChange={() => {}}
+              onChange={(e) => {
+                const val = e.target.value.padStart(2, '0');
+                commitTimeParts({ ...timeParts, hour: val });
+              }}
               aria-label={amharic ? 'የሰዓት ቁጥር' : 'Alarm hour'}
               readOnly
             />
@@ -342,21 +599,48 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
               id="alarm-minute-input"
               type="text"
               inputMode="numeric"
-              className="sr-only"
               value={timeParts.minute}
-              onChange={() => {}}
+              onChange={(e) => {
+                const val = e.target.value.padStart(2, '0');
+                commitTimeParts({ ...timeParts, minute: val });
+              }}
               aria-label={amharic ? 'የደቂቃ ቁጥር' : 'Alarm minute'}
               readOnly
             />
-            <div className="flex gap-3" role="group" aria-label="AM or PM">
-              <button type="button" aria-pressed={timeParts.period === 'AM'} onClick={() => commitTimeParts({ ...timeParts, period: 'AM' })} className="hidden">
+            <div role="group" aria-label="AM or PM">
+              <button
+                type="button"
+                aria-pressed={timeParts.period === 'AM'}
+                onClick={() => commitTimeParts({ ...timeParts, period: 'AM' })}
+              >
                 AM
               </button>
-              <button type="button" aria-pressed={timeParts.period === 'PM'} onClick={() => commitTimeParts({ ...timeParts, period: 'PM' })} className="hidden">
+              <button
+                type="button"
+                aria-pressed={timeParts.period === 'PM'}
+                onClick={() => commitTimeParts({ ...timeParts, period: 'PM' })}
+              >
                 PM
               </button>
             </div>
-            <button type="button" onClick={() => commitTimeParts(addMinutes(timeParts, 1))} aria-label={`Increase ${amharic ? 'ደቂቃ' : 'Alarm minute'}`}>
+          </div>
+
+          {/* Subdued minus/plus stepper row below the wheels */}
+          <div className="mt-2 flex justify-center gap-10 text-[13px] font-medium text-slate-600">
+            <button
+              type="button"
+              onClick={() => commitTimeParts(addMinutes(timeParts, -1))}
+              aria-label={`Decrease ${amharic ? 'ደቂቃ' : 'Alarm minute'}`}
+              className="p-1 hover:text-slate-400 active:scale-95 transition"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => commitTimeParts(addMinutes(timeParts, 1))}
+              aria-label={`Increase ${amharic ? 'ደቂቃ' : 'Alarm minute'}`}
+              className="p-1 hover:text-slate-400 active:scale-95 transition"
+            >
               +
             </button>
           </div>
@@ -426,9 +710,6 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
               );
             })}
           </div>
-
-          <Row label={amharic ? 'የንቃት ማረጋገጫ' : 'Wake up check'} locked hot value={amharic ? 'ጠፍቷል' : 'Off'} />
-          <Row label={amharic ? 'ኃይል እንዳይጠፋ' : 'Prevent power-off'} value={amharic ? 'ጠፍቷል' : 'Off'} />
         </section>
 
         <p className="mb-2 px-1 text-[13px] text-slate-500">{amharic ? 'የማንቂያ ድምፅ' : 'Alarm sound'}</p>
@@ -493,23 +774,173 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
             onClick={() => onGentleWakeUpChange(!gentleWakeUp)}
             switchOn={gentleWakeUp}
           />
-          <ToggleRow label={amharic ? 'የሰዓት ማስታወሻ' : 'Time reminder'} sample checked={timeReminder} onChange={setTimeReminder} />
-          <ToggleRow label={amharic ? 'የአየር ሁኔታ ማስታወሻ' : 'Weather reminder'} sample checked={weatherReminder} onChange={setWeatherReminder} />
-          <Row label={amharic ? 'የስም ማስታወሻ' : 'Label reminder'} locked />
-          <Row label={amharic ? 'ተጨማሪ ጮክ ድምፅ' : 'Extra loud effect'} locked />
         </section>
 
         <p className="mb-2 px-1 text-[13px] text-slate-500">{amharic ? 'ተጨማሪ ቅንብር' : 'Custom setting'}</p>
-        <section className="rounded-[22px] bg-[#1c1c1e] p-4">
-          <Row label={amharic ? 'እንቅልፍ' : 'Snooze'} value={amharic ? '5 ደቂቃ, 3 ጊዜ' : '5 min, 3 times'} />
-          <div className="flex items-center justify-between py-3">
-            <span className="text-[15px] text-white">{amharic ? 'የማንቂያ ዳራ' : 'Alarm wallpaper'}</span>
-            <div className="h-12 w-12 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-900 via-fuchsia-700 to-amber-300">
-              <div className="flex h-full items-end justify-center text-2xl">🐱</div>
+        <section className="rounded-[22px] bg-[#1c1c1e] p-4 divide-y divide-slate-800/60">
+          <Row
+            label={amharic ? 'እንቅልፍ' : 'Snooze'}
+            value={snoozeDisplayLabel}
+            onClick={() => setShowSnoozeModal(true)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowWallpaperModal(true)}
+            className="flex w-full items-center justify-between py-3 text-left group"
+          >
+            <span className="text-[15px] text-white font-medium group-hover:text-rose-400 transition">
+              {amharic ? 'የማንቂያ ዳራ' : 'Alarm wallpaper'}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-slate-400 group-hover:text-white transition">
+                {amharic ? currentWallpaperChoice.nameAm : currentWallpaperChoice.name}
+              </span>
+              <div className={`h-8 w-8 overflow-hidden rounded-xl bg-gradient-to-br ${currentWallpaperChoice.gradient} border border-slate-700/80 flex items-center justify-center text-lg shadow-sm`}>
+                {currentWallpaperChoice.emoji}
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-500" />
             </div>
-          </div>
+          </button>
         </section>
       </div>
+
+      {/* Snooze Settings Bottom Sheet Modal */}
+      {showSnoozeModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] bg-[#18191d] border border-slate-800 p-6 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">
+                {amharic ? 'የእንቅልፍ ማስተካከያ (Snooze)' : 'Snooze Settings'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowSnoozeModal(false)}
+                className="rounded-full bg-slate-800 p-2 text-slate-400 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Snooze Interval Selection */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {amharic ? 'የደቂቃ ቆይታ (Interval)' : 'Snooze Interval'}
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 3, 5, 10, 15, 20, 30, 0].map((mins) => {
+                  const isSelected = activeSnoozeInterval === mins;
+                  return (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => handleSnoozeApply(mins, activeSnoozeLimit === 0 ? 3 : activeSnoozeLimit)}
+                      className={`py-2.5 px-2 rounded-xl text-xs font-bold transition ${
+                        isSelected
+                          ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/25 border border-rose-400'
+                          : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/50'
+                      }`}
+                    >
+                      {mins === 0
+                        ? (amharic ? 'ጠፍቷል' : 'Off')
+                        : (amharic ? `${mins} ደ` : `${mins} min`)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Snooze Limit Selection */}
+            {activeSnoozeInterval > 0 && (
+              <div className="space-y-2.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {amharic ? 'የድግግሞሽ ብዛት (Repeat Limit)' : 'Repeat Limit'}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3, 5, 10, 99].map((limit) => {
+                    const isSelected = activeSnoozeLimit === limit;
+                    return (
+                      <button
+                        key={limit}
+                        type="button"
+                        onClick={() => handleSnoozeApply(activeSnoozeInterval, limit)}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold transition ${
+                          isSelected
+                            ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/25 border border-rose-400'
+                            : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/50'
+                        }`}
+                      >
+                        {limit === 99
+                          ? (amharic ? 'ያልተገደበ' : 'Continuous')
+                          : (amharic ? `${limit} ጊዜ` : `${limit} times`)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Confirm / Done Button */}
+            <button
+              type="button"
+              onClick={() => setShowSnoozeModal(false)}
+              className="w-full py-3.5 bg-rose-500 hover:bg-rose-400 text-white font-bold rounded-2xl shadow-lg shadow-rose-500/20 transition text-sm"
+            >
+              {amharic ? 'አረጋግጥ' : 'Done'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Wallpaper Picker Modal */}
+      {showWallpaperModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] bg-[#18191d] border border-slate-800 p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">
+                {amharic ? 'የማንቂያ ዳራ ይምረጡ' : 'Choose Alarm Wallpaper'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowWallpaperModal(false)}
+                className="rounded-full bg-slate-800 p-2 text-slate-400 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 max-h-72 overflow-y-auto">
+              {WALLPAPER_CHOICES.map((wp) => {
+                const isSelected = activeWallpaper === wp.id;
+                return (
+                  <button
+                    key={wp.id}
+                    type="button"
+                    onClick={() => {
+                      handleWallpaperApply(wp.id);
+                      setShowWallpaperModal(false);
+                    }}
+                    className={`flex items-center justify-between p-3 rounded-2xl border transition ${
+                      isSelected
+                        ? 'border-rose-500 bg-rose-500/10'
+                        : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${wp.gradient} flex items-center justify-center text-xl shadow-md`}>
+                        {wp.emoji}
+                      </div>
+                      <span className="font-bold text-sm text-white">
+                        {amharic ? wp.nameAm : wp.name}
+                      </span>
+                    </div>
+                    {isSelected && <Check className="h-5 w-5 text-rose-400 stroke-[3]" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-[#0b0b0d] via-[#0b0b0d] to-transparent">
         <div className="mx-auto max-w-xl px-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
@@ -526,75 +957,46 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   );
 };
 
-const WheelRow: React.FC<{
-  parts: { hour: string; minute: string; period: string };
-  muted?: boolean;
-  onClick?: () => void;
-}> = ({ parts, muted, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={!onClick}
-    className={`grid w-full grid-cols-[1fr_auto_1fr_auto] items-baseline justify-items-center px-8 py-2 font-light tracking-tight ${
-      muted ? 'text-slate-500' : 'text-white'
-    }`}
-  >
-    <span className={`tabular-nums ${muted ? 'text-[28px]' : 'text-[40px] leading-none'}`}>{parts.hour}</span>
-    <span className={`px-2 ${muted ? 'text-[28px]' : 'text-[40px] leading-none'}`}>:</span>
-    <span className={`tabular-nums ${muted ? 'text-[28px]' : 'text-[40px] leading-none'}`}>{parts.minute}</span>
-    <span className={`w-12 text-left text-[15px] ${muted ? 'text-slate-500' : 'text-slate-300'}`}>{parts.period}</span>
-  </button>
-);
-
 const Row: React.FC<{
   label: string;
   value?: string;
-  locked?: boolean;
-  hot?: boolean;
   onClick?: () => void;
   switchOn?: boolean;
-}> = ({ label, value, locked, hot, onClick }) => (
-  <button type="button" onClick={onClick} className="flex w-full items-center justify-between py-3 text-left">
+}> = ({ label, value, onClick, switchOn }) => (
+  <button
+    type="button"
+    role={switchOn !== undefined ? 'switch' : undefined}
+    aria-checked={switchOn !== undefined ? switchOn : undefined}
+    onClick={onClick}
+    className="flex w-full items-center justify-between py-3 text-left"
+  >
     <span className="flex items-center gap-2 text-[15px] text-white">
       {label}
-      {locked && <Lock className="h-3.5 w-3.5 text-slate-500" />}
-      {hot && <span className="rounded-md bg-rose-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">HOT</span>}
     </span>
-    {value && (
-      <span className="flex items-center gap-1 text-[14px] text-slate-500">
-        {value}
-        <ChevronRight className="h-4 w-4" />
-      </span>
+    {switchOn !== undefined ? (
+      <div className="flex items-center gap-2">
+        {value && <span className="text-[14px] text-slate-500">{value}</span>}
+        <span
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            switchOn ? 'bg-sky-500' : 'bg-[#3a3a3e]'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              switchOn ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </span>
+      </div>
+    ) : (
+      value && (
+        <span className="flex items-center gap-1 text-[14px] text-slate-500">
+          {value}
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      )
     )}
   </button>
-);
-
-const ToggleRow: React.FC<{
-  label: string;
-  sample?: boolean;
-  checked: boolean;
-  onChange: (next: boolean) => void;
-}> = ({ label, sample, checked, onChange }) => (
-  <div className="flex items-center justify-between py-3">
-    <span className="flex items-center gap-2 text-[15px] text-white">
-      {label}
-      {sample && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#2a2a2e] px-2 py-0.5 text-[11px] text-slate-300">
-          <Play className="h-2.5 w-2.5 fill-current" /> Sample
-        </span>
-      )}
-    </span>
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-full p-1 transition ${checked ? 'bg-sky-500' : 'bg-[#3a3a3e]'}`}
-    >
-      <span className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-    </button>
-  </div>
 );
 
 export default AlarmEditorScreen;

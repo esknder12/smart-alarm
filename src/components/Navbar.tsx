@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TabType } from '../types';
-import { AlarmClock, Sun, Moon, Settings, Globe } from 'lucide-react';
+import { AlarmClock, Moon, Settings, Globe } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
 import { AppLogo } from './AppLogo';
 
@@ -38,8 +38,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; badge?: boolean }[] = [
     { id: 'alarm', label: t.alarm, icon: <AlarmClock className="w-5 h-5" /> },
-    { id: 'sleep', label: t.sleep, icon: <Moon className="w-5 h-5" /> },
-    { id: 'morning', label: t.morning, icon: <Sun className="w-5 h-5" /> },
     { id: 'settings', label: t.setting, icon: <Settings className="w-5 h-5" />, badge: true },
   ];
 

@@ -58,6 +58,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   const [volume, setVolume] = useState(80);
   const [gentleWakeUp, setGentleWakeUp] = useState(true);
   const [wallpaper, setWallpaper] = useState<WallpaperId>('capybara');
+  const [snoozeInterval, setSnoozeInterval] = useState(5);
+  const [snoozeLimit, setSnoozeLimit] = useState(3);
   const [challenge, setChallenge] = useState<ChallengeType>('math');
   const [challengeDifficulty, setChallengeDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
 
@@ -130,6 +132,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setVolume(80);
     setGentleWakeUp(true);
     setWallpaper('capybara');
+    setSnoozeInterval(5);
+    setSnoozeLimit(3);
     setChallenge('math');
     setChallengeDifficulty('easy');
     setIsEditorOpen(true);
@@ -145,6 +149,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setVolume(alarm.volume);
     setGentleWakeUp(alarm.gentleWakeUp ?? true);
     setWallpaper(alarm.wallpaper ?? 'capybara');
+    setSnoozeInterval(alarm.snoozeInterval ?? 5);
+    setSnoozeLimit(alarm.snoozeLimit ?? 3);
     setChallenge(alarm.challenge);
     setChallengeDifficulty(alarm.challengeDifficulty);
     setIsEditorOpen(true);
@@ -170,6 +176,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         volume,
         gentleWakeUp,
         wallpaper,
+        snoozeInterval,
+        snoozeLimit,
         challenge,
         challengeDifficulty,
       });
@@ -183,6 +191,8 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         volume,
         gentleWakeUp,
         wallpaper,
+        snoozeInterval,
+        snoozeLimit,
         challenge,
         challengeDifficulty,
       });
@@ -211,6 +221,12 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         onGentleWakeUpChange={setGentleWakeUp}
         challenge={challenge}
         onChallengeChange={setChallenge}
+        snoozeInterval={snoozeInterval}
+        onSnoozeIntervalChange={setSnoozeInterval}
+        snoozeLimit={snoozeLimit}
+        onSnoozeLimitChange={setSnoozeLimit}
+        wallpaper={wallpaper}
+        onWallpaperChange={setWallpaper}
         canCancel={!openEditorOnMount}
         onCancel={() => {
           if (openEditorOnMount) return;

@@ -86,6 +86,7 @@ public class AlarmRingService extends Service {
     private boolean nativeAudioActive;
     private boolean finished;
     private PowerManager.WakeLock wakeLock;
+    private PowerManager.WakeLock screenWakeLock;
     private Vibrator vibrator;
 
     /** Builds the intent that starts (or resumes) the ring. */
@@ -169,6 +170,14 @@ public class AlarmRingService extends Service {
         acquireWakeLock();
         player.start(alarm.volume, alarm.gentleWakeUp);
         startVibration();
+
+        // Directly launch the puzzle activity into the foreground
+        try {
+            Intent open = AlarmScheduler.ringScreenIntent(this, alarm);
+            startActivity(open);
+        } catch (Exception e) {
+            Log.w(TAG, "Direct startActivity from AlarmRingService failed: " + e.getMessage());
+        }
 
         handler.removeCallbacks(autoStop);
         handler.postDelayed(autoStop, AUTO_STOP_MS);
@@ -287,16 +296,41 @@ public class AlarmRingService extends Service {
 
     // ---------------------------------------------------------------------------------- the rest
 
+    @SuppressWarnings("deprecation")
     private void acquireWakeLock() {
-        if (wakeLock != null && wakeLock.isHeld()) return;
         PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (power == null) return;
-        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "niqu:alarm-ringing");
-        wakeLock.setReferenceCounted(false);
-        wakeLock.acquire(AUTO_STOP_MS + 60_000L);
+
+        if (wakeLock == null || !wakeLock.isHeld()) {
+            wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "niqu:alarm-ringing");
+            wakeLock.setReferenceCounted(false);
+            wakeLock.acquire(AUTO_STOP_MS + 60_000L);
+        }
+
+        try {
+            if (screenWakeLock == null || !screenWakeLock.isHeld()) {
+                screenWakeLock = power.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                    | PowerManager.ON_AFTER_RELEASE,
+                    "niqu:alarm-screen"
+                );
+                screenWakeLock.setReferenceCounted(false);
+                screenWakeLock.acquire(15_000L); // Hold screen on for 15s while activity surfaces
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Screen wake lock acquire failed: " + e.getMessage());
+        }
     }
 
     private void releaseWakeLock() {
+        if (screenWakeLock != null) {
+            try {
+                if (screenWakeLock.isHeld()) screenWakeLock.release();
+            } catch (RuntimeException ignored) {
+            }
+            screenWakeLock = null;
+        }
         if (wakeLock == null) return;
         try {
             if (wakeLock.isHeld()) wakeLock.release();

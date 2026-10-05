@@ -37,5 +37,13 @@ public class AlarmReceiver extends BroadcastReceiver {
         new AlarmScheduler(context).schedule(stored);
         Log.i(TAG, "Firing " + stored);
         ContextCompat.startForegroundService(context, AlarmRingService.ringIntent(context, stored));
+
+        // Directly launch the activity so the user immediately sees the full-screen Niqu puzzle interface
+        try {
+            Intent ringScreen = AlarmScheduler.ringScreenIntent(context, stored);
+            context.startActivity(ringScreen);
+        } catch (Exception e) {
+            Log.w(TAG, "Direct startActivity from AlarmReceiver failed: " + e.getMessage());
+        }
     }
 }
