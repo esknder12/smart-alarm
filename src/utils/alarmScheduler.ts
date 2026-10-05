@@ -73,6 +73,8 @@ export interface AlarmScheduleState {
   notificationsAllowed: boolean;
   /** Android 14+ lets the user switch the full-screen (over-the-lock-screen) notification off. */
   fullScreenIntentAllowed: boolean;
+  /** SYSTEM_ALERT_WINDOW / “Appear on top” — alarm can come in front of other apps. */
+  overlayAllowed: boolean;
   /** e.g. "samsung SM-A155F" - shown in the reliability panel so device bugs are reportable. */
   deviceModel: string;
   sdkInt: number;
@@ -108,6 +110,7 @@ export function unavailableState(): AlarmScheduleState {
     exactAlarmsAllowed: false,
     notificationsAllowed: false,
     fullScreenIntentAllowed: false,
+    overlayAllowed: false,
     deviceModel: '',
     sdkInt: 0,
     ringing: null,
@@ -282,7 +285,7 @@ export const nativeAlarmScheduler = {
   },
 
   /** Opens the Android screen where exact alarms / full-screen notifications are granted. */
-  async openSettings(target: 'exactAlarm' | 'fullScreenIntent'): Promise<boolean> {
+  async openSettings(target: 'exactAlarm' | 'fullScreenIntent' | 'overlay'): Promise<boolean> {
     const native = getBackend();
     if (!native) return false;
     try {

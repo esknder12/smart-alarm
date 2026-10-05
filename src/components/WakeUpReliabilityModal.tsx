@@ -33,7 +33,7 @@ export const WakeUpReliabilityModal: React.FC<WakeUpReliabilityModalProps> = ({ 
     void refresh();
   }, [refresh]);
 
-  const openSystemScreen = async (target: 'exactAlarm' | 'fullScreenIntent') => {
+  const openSystemScreen = async (target: 'exactAlarm' | 'fullScreenIntent' | 'overlay') => {
     setBusy(target);
     await nativeAlarmScheduler.openSettings(target);
     setBusy(null);
@@ -110,6 +110,21 @@ export const WakeUpReliabilityModal: React.FC<WakeUpReliabilityModalProps> = ({ 
           action: state?.fullScreenIntentAllowed
             ? undefined
             : { label: isAm ? 'ክፈት' : 'Open', run: () => void openSystemScreen('fullScreenIntent') },
+        },
+        {
+          key: 'overlay',
+          ok: Boolean(state?.overlayAllowed),
+          title: isAm ? 'ከሌሎች መተግበሪያዎች በላይ ታይ (Appear on top)' : 'Appear on top of other apps',
+          detail: state?.overlayAllowed
+            ? isAm
+              ? 'ማንቂያው ሲደውል ከሌላ መተግበሪያ በፊት ይታያል።'
+              : 'The alarm can come in front of whatever app you are using.'
+            : isAm
+              ? 'ይህን ፈቃድ ይስጡ ማንቂያው ሌላ መተግበሪያ ሲከፈት እንዲታይ። Settings → Appear on top.'
+              : 'Grant this so the alarm appears in front of other apps. Samsung: Settings → Appear on top.',
+          action: state?.overlayAllowed
+            ? undefined
+            : { label: isAm ? 'ፍቃድ ስጥ' : 'Allow', run: () => void openSystemScreen('overlay') },
         },
       ]
     : [];

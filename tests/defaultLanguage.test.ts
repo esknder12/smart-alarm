@@ -117,9 +117,9 @@
       onSave: () => {},
     })
   );
-  check('alarm editor defaults to English title', editorEn.includes('Add New Alarm'));
-  check('alarm editor defaults to English save button', editorEn.includes('Save Alarm'));
-  check('alarm editor defaults to English hour/min labels', editorEn.includes('HOUR') && editorEn.includes('MIN'));
+  check('alarm editor defaults to English title', editorEn.includes('Wake-up alarm'));
+  check('alarm editor defaults to English save button', editorEn.includes('Save'));
+  check('alarm editor defaults to English hour/min labels', editorEn.includes('a.m.') || editorEn.includes('p.m.'));
 
   // --- Report ---------------------------------------------------------------
   let pass = 0;

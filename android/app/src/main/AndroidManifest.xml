@@ -103,4 +103,10 @@
 
     <!-- The alarm takes the screen over the lock screen (Android 14+ gates this behind a toggle). -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!--
+        Appear on top / draw over other apps (Samsung: Settings → Appear on top).
+        Lets the ringing alarm come to the front even when another app is open.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 </manifest>

@@ -130,9 +130,14 @@ public class AlarmSchedulerPlugin extends Plugin {
     public void openSettings(PluginCall call) {
         Context context = getContext();
         String target = call.getString("target", "exactAlarm");
-        Intent intent = "fullScreenIntent".equals(target)
-            ? AlarmScheduler.fullScreenIntentPermissionIntent(context)
-            : AlarmScheduler.exactAlarmPermissionIntent(context);
+        Intent intent;
+        if ("fullScreenIntent".equals(target)) {
+            intent = AlarmScheduler.fullScreenIntentPermissionIntent(context);
+        } else if ("overlay".equals(target)) {
+            intent = AlarmScheduler.overlayPermissionIntent(context);
+        } else {
+            intent = AlarmScheduler.exactAlarmPermissionIntent(context);
+        }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             context.startActivity(intent);
@@ -174,6 +179,7 @@ public class AlarmSchedulerPlugin extends Plugin {
         out.put("exactAlarmsAllowed", state.exact);
         out.put("notificationsAllowed", AlarmScheduler.notificationsAllowed(context));
         out.put("fullScreenIntentAllowed", AlarmScheduler.canUseFullScreenIntent(context));
+        out.put("overlayAllowed", AlarmScheduler.canDrawOverlays(context));
         out.put("deviceModel", deviceModel());
         out.put("sdkInt", Build.VERSION.SDK_INT);
         out.put("ringing", ringingPayload(RingSession.shared().snapshot()));
