@@ -5,6 +5,7 @@ import { audioEngine } from '../utils/audio';
 import { nativeAlarmScheduler } from '../utils/alarmScheduler';
 import { buildFirstAlarm } from '../utils/firstRun';
 import { formatTime12h } from '../utils/alarmText';
+import { Language } from '../utils/translations';
 import {
   Trophy,
   Star,
@@ -36,6 +37,7 @@ interface OnboardingTourProps {
    * step spells out the alarm it is about to create. Re-opened from Settings it is optional.
    */
   mandatory?: boolean;
+  language?: Language;
 }
 
 export interface ThemeOption {
@@ -143,7 +145,8 @@ export const AUDIO_TRACKS = [
   },
 ];
 
-export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onClose, mandatory = false }) => {
+export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onClose, mandatory = false, language = 'en' }) => {
+  const isAm = language === 'am';
   // Steps: 0 to 3 (4 setup steps)
   // 0: Step 1/4 - Set start time
   // 1: Step 2/4 - Mission category
@@ -370,7 +373,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
                     }}
                     className="bg-slate-900 border border-slate-700 w-24 py-3 rounded-2xl text-4xl font-black text-red-500 shadow-inner text-center focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30 transition"
                   />
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ሰዓት</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">
+                    {isAm ? 'ሰዓት' : 'Hour'}
+                  </span>
                 </div>
 
                 <span className="text-4xl font-black text-slate-500 pb-5">:</span>
@@ -394,7 +399,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
                     }}
                     className="bg-slate-900 border border-slate-700 w-24 py-3 rounded-2xl text-4xl font-black text-red-500 shadow-inner text-center focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/30 transition"
                   />
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ደቂቃ</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">
+                    {isAm ? 'ደቂቃ' : 'Minute'}
+                  </span>
                 </div>
 
                 {/* AM / PM Toggle */}
@@ -406,7 +413,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
                   >
                     {period}
                   </button>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">ክፍለ-ጊዜ</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-sans font-bold mt-2">
+                    {isAm ? 'ክፍለ-ጊዜ' : 'Period'}
+                  </span>
                 </div>
               </div>
 
@@ -415,7 +424,10 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
 
             <p className="text-xs text-slate-400 flex items-center justify-center space-x-1.5">
               <Clock className="w-3.5 h-3.5 text-red-400" />
-              <span>የተመረጠው ሰዓት: <strong className="text-red-400 font-extrabold">{hour}:{minute} {period}</strong></span>
+              <span>
+                {isAm ? 'የተመረጠው ሰዓት:' : 'Selected time:'}{' '}
+                <strong className="text-red-400 font-extrabold">{hour}:{minute} {period}</strong>
+              </span>
             </p>
           </div>
         )}

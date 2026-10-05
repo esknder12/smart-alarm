@@ -54,13 +54,27 @@ export default function App() {
   // Briefly rings the card of the alarm the wizard just created, so the user sees it landed.
   const [highlightAlarmId, setHighlightAlarmId] = useState<string | null>(null);
 
-  // Language state
+  // Language state: English by default on initial launch, while retaining Amharic as a full option.
   const [language, setLanguage] = useState<Language>(() => {
-    return 'am';
+    try {
+      const saved = typeof window !== 'undefined' && window.localStorage
+        ? localStorage.getItem('alarmy_language')
+        : null;
+      if (saved === 'en' || saved === 'am') {
+        return saved;
+      }
+    } catch {
+      // In private browsing or restricted environments, localStorage may throw
+    }
+    return 'en';
   });
 
   useEffect(() => {
-    localStorage.setItem('alarmy_language', language);
+    try {
+      localStorage.setItem('alarmy_language', language);
+    } catch {
+      // ignore storage errors
+    }
   }, [language]);
 
   const t = translations[language];
@@ -316,6 +330,7 @@ export default function App() {
         mandatory={false}
         onComplete={handleTourComplete}
         onClose={() => setShowTour(false)}
+        language={language}
       />
     );
   }

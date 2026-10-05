@@ -25,7 +25,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
   alarm,
   onDismiss,
   onSnooze,
-  language = 'am',
+  language = 'en',
 }) => {
   const isAm = language === 'am';
   const [volumeAttemptBlocked, setVolumeAttemptBlocked] = useState<boolean>(false);
@@ -115,13 +115,21 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
     if (alarm.challenge === 'math') {
       generateMathProblem();
     } else if (alarm.challenge === 'typing') {
-      const affirmations = [
+      const affirmationsAm = [
         'ነቅቻለሁ እና ለዛሬው ቀን ዝግጁ ነኝ',
         'ዛሬ አዳዲስ እድሎችን እና እድገትን ያመጣል',
         'ይህንን ጠዋት በጠራ አእምሮ እቀበላለሁ',
         'ዛሬ ግቦቼን ለማሳካት ብቃት አለኝ',
         'እያንዳንዱ ቀን አዲስ ጅምር ነው'
       ];
+      const affirmationsEn = [
+        'I am awake and ready for today',
+        'Today brings new opportunities and growth',
+        'I embrace this morning with a clear mind',
+        'I have the power to accomplish my goals today',
+        'Every day is a fresh beginning'
+      ];
+      const affirmations = isAm ? affirmationsAm : affirmationsEn;
       setAffirmation(affirmations[Math.floor(Math.random() * affirmations.length)]);
     } else if (alarm.challenge === 'memory' || alarm.challenge === 'tiles') {
       generateMemorySequence();
@@ -533,11 +541,11 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
             </div>
           </div>
 
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">{alarm.label || 'የመነቂያ ሰዓት!'}</h2>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">{alarm.label || (isAm ? 'የመነቂያ ሰዓት!' : 'Wake-up Time!')}</h2>
           {activeWallpaper.quote && (
             <p className="text-amber-300/90 text-xs italic mt-1 px-4">"{activeWallpaper.quote}"</p>
           )}
-          <p className="text-slate-400 text-xs mt-1">የተያዘለት ሰዓት: {alarm.time}</p>
+          <p className="text-slate-400 text-xs mt-1">{isAm ? 'የተያዘለት ሰዓት:' : 'Scheduled for:'} {alarm.time}</p>
 
           {/* Current Time Big Display */}
           <div className="my-5 py-4 bg-slate-950/70 rounded-2xl border border-slate-800/80 shadow-inner">
@@ -552,7 +560,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <span className="text-amber-400 font-bold flex items-center space-x-1.5">
                   <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                  <span>30 ሰከንድ የድምፅ በደረጃ መጨመሪያ</span>
+                  <span>{isAm ? '30 ሰከንድ የድምፅ በደረጃ መጨመሪያ' : '30s Auto-Fade Volume Ramp'}</span>
                 </span>
                 <span className="font-mono text-slate-300 font-bold text-[11px]">
                   {currentVolumePercent}% ({fadeProgressSec}s / 30s)
@@ -566,8 +574,8 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
               </div>
               <p className="text-[10px] text-slate-400">
                 {fadeProgressSec < 30
-                  ? 'ከባድ ድንጋጤን ለመከላከል ድምፁ በደረጃ እየጨመረ ነው...'
-                  : 'የተፈለገው የድምፅ መጠን ላይ ደርሷል!'}
+                  ? (isAm ? 'ከባድ ድንጋጤን ለመከላከል ድምፁ በደረጃ እየጨመረ ነው...' : 'Gradually ramping up volume to prevent shock...')
+                  : (isAm ? 'የተፈለገው የድምፅ መጠን ላይ ደርሷል!' : 'Target volume reached!')}
               </p>
             </div>
           )}
@@ -577,24 +585,30 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
             <div className="my-5 bg-slate-800/70 p-5 rounded-2xl border border-slate-700/60 text-left">
               <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm mb-3">
                 <ShieldAlert className="w-4 h-4" />
-                <span>Wake-Up Challenge Required</span>
+                <span>{isAm ? 'የመንቂያ ፈተና ያስፈልጋል' : 'Wake-Up Challenge Required'}</span>
               </div>
 
               {alarm.challenge === 'math' && (
                 <div>
-                  <p className="text-xs text-slate-300 mb-2">Solve this math equation to turn off the alarm:</p>
+                  <p className="text-xs text-slate-300 mb-2">
+                    {isAm ? 'ማንቂያውን ለማጥፋት ይህንን የሂሳብ ጥያቄ ይመልሱ:' : 'Solve this math equation to turn off the alarm:'}
+                  </p>
                   <form onSubmit={handleMathSubmit} className="space-y-3">
                     <div className="text-2xl font-mono font-bold text-center text-white py-2 bg-slate-900 rounded-lg">
                       {mathProblem.question} = ?
                     </div>
-                    {mathError && <p className="text-xs text-rose-400 font-medium">Incorrect answer, try this new equation!</p>}
+                    {mathError && (
+                      <p className="text-xs text-rose-400 font-medium">
+                        {isAm ? 'ትክክል አይደለም፣ አዲሱን ጥያቄ ይሞክሩ!' : 'Incorrect answer, try this new equation!'}
+                      </p>
+                    )}
                     <input
                       type="number"
                       inputMode="numeric"
                       onFocus={keepFocusedFieldVisible}
                       value={userMathInput}
                       onChange={(e) => setUserMathInput(e.target.value)}
-                      placeholder="Type answer..."
+                      placeholder={isAm ? 'መልሱን ይፃፉ...' : 'Type answer...'}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       autoFocus
                     />
@@ -602,7 +616,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                       type="submit"
                       className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition"
                     >
-                      Submit Answer
+                      {isAm ? 'መልስ አስገባ' : 'Submit Answer'}
                     </button>
                   </form>
                 </div>
@@ -610,7 +624,9 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 
               {alarm.challenge === 'shake' && (
                 <div className="text-center space-y-3">
-                  <p className="text-xs text-slate-300">Tap or Shake phone {targetShakes} times to wake up your body:</p>
+                  <p className="text-xs text-slate-300">
+                    {isAm ? `ስልክዎን ${targetShakes} ጊዜ ይንቀጥቅጡ:` : `Tap or Shake phone ${targetShakes} times to wake up your body:`}
+                  </p>
                   <div className="w-full bg-slate-900 rounded-full h-4 p-0.5 border border-slate-700 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-200"
@@ -618,21 +634,23 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                     />
                   </div>
                   <div className="text-2xl font-mono font-black text-amber-400">
-                    {shakeCount} / {targetShakes} Shakes
+                    {shakeCount} / {targetShakes} {isAm ? 'መንቀጥቀጦች' : 'Shakes'}
                   </div>
                   <button
                     onClick={handleShake}
                     className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-3.5 rounded-xl transition flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 active:scale-95"
                   >
                     <Smartphone className="w-5 h-5 animate-bounce" />
-                    <span>Tap / Shake Device!</span>
+                    <span>{isAm ? 'መሣሪያውን ንካ / አንቀጥቅጥ!' : 'Tap / Shake Device!'}</span>
                   </button>
                 </div>
               )}
 
               {alarm.challenge === 'typing' && (
                 <div>
-                  <p className="text-xs text-slate-300 mb-2">Type the exact phrase below to unlock dismissal:</p>
+                  <p className="text-xs text-slate-300 mb-2">
+                    {isAm ? 'ማንቂያውን ለማጥፋት ከታች ያለውን ሐረግ በትክክል ይፃፉ:' : 'Type the exact phrase below to unlock dismissal:'}
+                  </p>
                   <div className="text-sm font-medium text-amber-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 mb-3 italic">
                     "{affirmation}"
                   </div>
@@ -641,7 +659,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                     onFocus={keepFocusedFieldVisible}
                     value={userTypingInput}
                     onChange={handleTypingChange}
-                    placeholder="Type affirmation here..."
+                    placeholder={isAm ? 'ሐረጉን እዚህ ይፃፉ...' : 'Type affirmation here...'}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     autoFocus
                   />
@@ -650,7 +668,9 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
 
               {(alarm.challenge === 'memory' || alarm.challenge === 'tiles') && (
                 <div>
-                  <p className="text-xs text-slate-300 mb-3">Repeat the 4-step flashing color pattern:</p>
+                  <p className="text-xs text-slate-300 mb-3">
+                    {isAm ? 'የሚበሩትን 4 ቀለሞች ቅደም ተከተል ይድገሙ:' : 'Repeat the 4-step flashing color pattern:'}
+                  </p>
                   <div className="grid grid-cols-2 gap-3 max-w-[200px] mx-auto mb-3">
                     {['bg-emerald-500', 'bg-sky-500', 'bg-amber-500', 'bg-rose-500'].map((color, idx) => (
                       <button
@@ -666,7 +686,7 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
                     onClick={generateMemorySequence}
                     className="w-full text-xs text-slate-400 hover:text-slate-200 py-1"
                   >
-                    Replay Sequence
+                    {isAm ? 'ቅደም ተከተሉን በድጋሚ አሳይ' : 'Replay Sequence'}
                   </button>
                 </div>
               )}
