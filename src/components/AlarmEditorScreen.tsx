@@ -2,17 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronRight,
+  Music,
   Pencil,
   Play,
+  Plus,
   Square,
+  Trash2,
   Volume2,
   X,
 } from 'lucide-react';
-import { Alarm, ChallengeType, RINGTONES_CATALOG, SoundType, WallpaperId } from '../types';
+import { Alarm, ChallengeType, CustomSound, RINGTONES_CATALOG, SoundType, WallpaperId, WALLPAPERS_CATALOG } from '../types';
 import { Language, translations } from '../utils/translations';
 import { audioEngine } from '../utils/audio';
 import { describeRepeat, nextOccurrence, shortDayName } from '../utils/alarmText';
 import { nativeAlarmScheduler } from '../utils/alarmScheduler';
+import { getCustomSounds, deleteCustomSound, getCachedCustomSounds } from '../utils/customSounds';
+import { CustomSoundModal } from './CustomSoundModal';
 
 export interface AlarmEditorScreenProps {
   editingAlarm: Alarm | null;
@@ -52,13 +57,7 @@ const HOURS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11',
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS: ('AM' | 'PM')[] = ['AM', 'PM'];
 
-const WALLPAPER_CHOICES: { id: WallpaperId; name: string; nameAm: string; emoji: string; gradient: string }[] = [
-  { id: 'capybara', name: 'Capybara Beat', nameAm: 'ካፒባራ ጀምበር', emoji: '🐱', gradient: 'from-indigo-900 via-fuchsia-700 to-amber-300' },
-  { id: 'default', name: 'Cosmic Dark', nameAm: 'ጠፈር ጥቁር', emoji: '🌌', gradient: 'from-slate-900 via-purple-950 to-slate-900' },
-  { id: 'motivation', name: 'Daily Motivation', nameAm: 'የእለት ማነቃቂያ', emoji: '🌅', gradient: 'from-amber-700 via-orange-600 to-rose-700' },
-  { id: 'space', name: 'Deep Space', nameAm: 'ጥልቅ ጠፈር', emoji: '🪐', gradient: 'from-purple-900 via-indigo-950 to-slate-950' },
-  { id: 'nature', name: 'Misty Forest', nameAm: 'ደን እና ጤዛ', emoji: '🌲', gradient: 'from-emerald-900 via-teal-800 to-slate-900' },
-];
+const WALLPAPER_CHOICES = WALLPAPERS_CATALOG;
 
 export function getTimeParts(time: string): TimeParts {
   const [hourString, minuteString] = (time || '07:00').split(':');
@@ -347,13 +346,23 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
   const [internalSnoozeInterval, setInternalSnoozeInterval] = useState(snoozeInterval ?? 5);
   const [internalSnoozeLimit, setInternalSnoozeLimit] = useState(snoozeLimit ?? 3);
-  const [internalWallpaper, setInternalWallpaper] = useState<WallpaperId>(wallpaper ?? 'capybara');
+  const [internalWallpaper, setInternalWallpaper] = useState<WallpaperId>(wallpaper ?? 'wakeup_rage');
+  const [soundCategoryFilter, setSoundCategoryFilter] = useState<string>('ALL');
+  const [customSounds, setCustomSounds] = useState<CustomSound[]>(() => getCachedCustomSounds());
+  const [showCustomSoundModal, setShowCustomSoundModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    void getCustomSounds().then((sounds) => setCustomSounds(sounds));
+  }, []);
 
   const activeSnoozeInterval = snoozeInterval !== undefined ? snoozeInterval : internalSnoozeInterval;
   const activeSnoozeLimit = snoozeLimit !== undefined ? snoozeLimit : internalSnoozeLimit;
   const activeWallpaper = wallpaper !== undefined ? wallpaper : internalWallpaper;
 
-  const currentWallpaperChoice = WALLPAPER_CHOICES.find((w) => w.id === activeWallpaper) || WALLPAPER_CHOICES[0];
+  const currentWallpaperChoice =
+    WALLPAPER_CHOICES.find((w) => w.id === activeWallpaper) ||
+    WALLPAPER_CHOICES.find((w) => w.id === 'wakeup_rage') ||
+    WALLPAPER_CHOICES[0];
 
   useEffect(() => () => audioEngine.stopAlarmSound(), []);
 
@@ -398,7 +407,8 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   }, [activeSnoozeInterval, activeSnoozeLimit, amharic]);
 
   const currentTone = RINGTONES_CATALOG.find((tone) => tone.id === sound);
-  const soundTitle = currentTone?.title ?? sound;
+  const customSoundMatch = customSounds.find((cs) => cs.id === sound);
+  const soundTitle = customSoundMatch ? `🎵 ${customSoundMatch.name}` : currentTone?.title ?? sound;
 
   const dayLetters = amharic
     ? [0, 1, 2, 3, 4, 5, 6].map((index) => shortDayName(index, 'am').slice(0, 1))
@@ -435,6 +445,29 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
     if (previewingSound) stopPreview();
     onSoundChange(soundId);
     setShowSoundPicker(false);
+  };
+
+  const handleCustomSoundAdded = (newSound: CustomSound) => {
+    setCustomSounds((prev) => [newSound, ...prev.filter((s) => s.id !== newSound.id)]);
+    onSoundChange(newSound.id as SoundType);
+    setSoundCategoryFilter('Custom Sounds');
+    togglePreview(newSound.id as SoundType);
+  };
+
+  const handleDeleteCustomSound = async (e: React.MouseEvent, soundId: string) => {
+    e.stopPropagation();
+    const confirmed = window.confirm(
+      amharic ? 'ይህንን ብጁ ድምፅ መሰረዝ ይፈልጋሉ?' : 'Are you sure you want to delete this custom sound?'
+    );
+    if (!confirmed) return;
+    if (previewingSound === soundId) {
+      stopPreview();
+    }
+    await deleteCustomSound(soundId);
+    setCustomSounds((prev) => prev.filter((s) => s.id !== soundId));
+    if (sound === soundId) {
+      onSoundChange('wakeup_wakeup');
+    }
   };
 
   const toggleDaily = () => {
@@ -727,22 +760,189 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
           </button>
 
           {showSoundPicker && (
-            <div className="mb-3 max-h-52 space-y-1 overflow-y-auto" role="group" aria-label={t.soundAndRingtone}>
-              {RINGTONES_CATALOG.map((tone) => {
-                const selected = sound === tone.id;
-                const playing = previewingSound === tone.id;
-                return (
-                  <div key={tone.id} className="flex items-center gap-2 rounded-xl px-1 py-1.5">
-                    <button type="button" onClick={() => selectSound(tone.id)} aria-pressed={selected} className="min-w-0 flex-1 truncate text-left text-[13px]">
-                      {tone.emoji} {tone.title}
-                      {selected && <Check className="ml-2 inline h-3 w-3 text-sky-400" />}
-                    </button>
-                    <button type="button" onClick={() => togglePreview(tone.id)} aria-label={playing ? `Stop ${tone.title} preview` : `Preview ${tone.title}`} className="text-slate-500">
-                      {playing ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current" />}
+            <div className="mb-3 space-y-2.5">
+              {/* Action Button: Add Custom Sound */}
+              <button
+                type="button"
+                onClick={() => setShowCustomSoundModal(true)}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-rose-500/15 via-amber-500/15 to-rose-500/10 border border-rose-500/40 hover:border-rose-500 hover:bg-rose-500/20 transition flex items-center justify-between text-left group shadow-sm"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20 group-hover:scale-105 transition">
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-white group-hover:text-rose-300 transition">
+                      {amharic ? '＋ ብጁ ድምፅ ጨምር' : '＋ Add Custom Sound'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {amharic ? 'ፋይል ስቀል፣ ድምፅ ቅረፅ፣ ወይም ፈጣን ድምጾች' : 'Upload audio, record your voice, or presets'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/25 text-rose-300 border border-rose-500/40">
+                  {amharic ? 'አዲስ' : 'NEW'}
+                </span>
+              </button>
+
+              {/* Category Filter Pills */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
+                {['ALL', 'Custom Sounds', 'Wake Up Voice', 'Extreme Loud', 'Viral & Trendy', 'Motivational', 'Scenery & Relax'].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSoundCategoryFilter(cat)}
+                    className={`px-2.5 py-1 rounded-xl whitespace-nowrap transition ${
+                      soundCategoryFilter === cat
+                        ? 'bg-rose-500 text-white font-black shadow-sm'
+                        : 'bg-[#252528] text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {cat === 'ALL'
+                      ? (amharic ? 'ሁሉም' : 'All')
+                      : cat === 'Custom Sounds'
+                      ? `${amharic ? 'የእኔ ድምጾች' : 'Custom Sounds'}${customSounds.length > 0 ? ` (${customSounds.length})` : ''}`
+                      : cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1" role="group" aria-label={t.soundAndRingtone}>
+                {/* 1. Custom User Sounds */}
+                {(soundCategoryFilter === 'ALL' || soundCategoryFilter === 'Custom Sounds') &&
+                  customSounds.map((cs) => {
+                    const selected = sound === cs.id;
+                    const playing = previewingSound === cs.id;
+                    return (
+                      <div
+                        key={cs.id}
+                        className={`flex items-center gap-2 rounded-2xl p-2.5 transition border ${
+                          selected
+                            ? 'border-rose-500/80 bg-rose-500/10'
+                            : 'border-slate-800/80 bg-[#161618] hover:bg-[#202024]'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => togglePreview(cs.id as SoundType)}
+                          aria-label={playing ? `Stop ${cs.name} preview` : `Preview ${cs.name}`}
+                          className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition ${
+                            playing
+                              ? 'bg-rose-500 text-white animate-pulse'
+                              : 'bg-[#2a2a2e] text-slate-300 hover:text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {playing ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => selectSound(cs.id as SoundType)}
+                          aria-pressed={selected}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
+                            <span className="text-base">🎵</span>
+                            <span className="text-[13px] font-bold text-white truncate">{cs.name}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30 whitespace-nowrap">
+                              {amharic ? 'ብጁ' : 'CUSTOM'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {cs.duration ? `${cs.duration}s • ` : ''}{amharic ? 'የራስዎ ድምፅ' : 'Your Custom Audio'}
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteCustomSound(e, cs.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 transition rounded-lg hover:bg-slate-800"
+                          title={amharic ? 'ሰርዝ' : 'Delete'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {selected && <Check className="h-4 w-4 text-rose-400 stroke-[3] shrink-0 mr-1" />}
+                      </div>
+                    );
+                  })}
+
+                {/* Empty State for Custom Sounds filter */}
+                {soundCategoryFilter === 'Custom Sounds' && customSounds.length === 0 && (
+                  <div className="p-6 rounded-2xl bg-[#161618] border border-slate-800 text-center space-y-3">
+                    <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
+                      <Music className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">
+                        {amharic ? 'ምንም ብጁ ድምፅ አልተጨመረም' : 'No custom sounds yet'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {amharic
+                          ? 'የሚወዱትን ዘፈን ይሰቅሉ ወይም የራስዎን ድምፅ ይቅረጹ!'
+                          : 'Upload an audio file, record your voice, or pick presets!'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomSoundModal(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition shadow-md"
+                    >
+                      {amharic ? '＋ ድምፅ ጨምር' : '＋ Add Sound Now'}
                     </button>
                   </div>
-                );
-              })}
+                )}
+
+                {/* 2. Built-in Catalog Tones */}
+                {soundCategoryFilter !== 'Custom Sounds' &&
+                  RINGTONES_CATALOG.filter((tone) => soundCategoryFilter === 'ALL' || tone.category === soundCategoryFilter).map((tone) => {
+                    const selected = sound === tone.id;
+                    const playing = previewingSound === tone.id;
+                    return (
+                      <div
+                        key={tone.id}
+                        className={`flex items-center gap-2 rounded-2xl p-2.5 transition border ${
+                          selected
+                            ? 'border-rose-500/80 bg-rose-500/10'
+                            : 'border-slate-800/80 bg-[#161618] hover:bg-[#202024]'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => togglePreview(tone.id)}
+                          aria-label={playing ? `Stop ${tone.title} preview` : `Preview ${tone.title}`}
+                          className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition ${
+                            playing
+                              ? 'bg-rose-500 text-white animate-pulse'
+                              : 'bg-[#2a2a2e] text-slate-300 hover:text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {playing ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => selectSound(tone.id)}
+                          aria-pressed={selected}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
+                            <span className="text-base">{tone.emoji}</span>
+                            <span className="text-[13px] font-bold text-white truncate">{tone.title}</span>
+                            {tone.badge && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                                {tone.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">{tone.subtitle}</div>
+                        </button>
+
+                        {selected && <Check className="h-4 w-4 text-rose-400 stroke-[3] shrink-0 mr-1" />}
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
           {!showSoundPicker && <p className="sr-only">{t.soundAndRingtone}</p>}
@@ -793,9 +993,9 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[13px] text-slate-400 group-hover:text-white transition">
-                {amharic ? currentWallpaperChoice.nameAm : currentWallpaperChoice.name}
+                {amharic && currentWallpaperChoice.nameAm ? currentWallpaperChoice.nameAm : currentWallpaperChoice.name}
               </span>
-              <div className={`h-8 w-8 overflow-hidden rounded-xl bg-gradient-to-br ${currentWallpaperChoice.gradient} border border-slate-700/80 flex items-center justify-center text-lg shadow-sm`}>
+              <div className={`h-8 w-8 overflow-hidden rounded-xl bg-gradient-to-br ${currentWallpaperChoice.bgGradient} border border-slate-700/80 flex items-center justify-center text-lg shadow-sm`}>
                 {currentWallpaperChoice.emoji}
               </div>
               <ChevronRight className="h-4 w-4 text-slate-500" />
@@ -894,11 +1094,16 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
       {/* Wallpaper Picker Modal */}
       {showWallpaperModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] bg-[#18191d] border border-slate-800 p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">
-                {amharic ? 'የማንቂያ ዳራ ይምረጡ' : 'Choose Alarm Wallpaper'}
-              </h3>
+          <div className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] bg-[#18191d] border border-slate-800 p-6 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800 shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-white">
+                  {amharic ? 'የማንቂያ ዳራ ይምረጡ' : 'Choose Alarm Wallpaper'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {amharic ? 'አስቂኝ እና አነቃቂ የማንቂያ ዳራዎች' : 'Funny, iconic & wake-up themed wallpapers'}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowWallpaperModal(false)}
@@ -908,39 +1113,66 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5 max-h-72 overflow-y-auto">
+            <div className="grid grid-cols-1 gap-2.5 overflow-y-auto pr-1">
               {WALLPAPER_CHOICES.map((wp) => {
                 const isSelected = activeWallpaper === wp.id;
                 return (
-                  <button
+                  <div
                     key={wp.id}
-                    type="button"
                     onClick={() => {
                       handleWallpaperApply(wp.id);
+                      if (wp.soundMatchId && sound !== wp.soundMatchId) {
+                        onSoundChange(wp.soundMatchId);
+                      }
                       setShowWallpaperModal(false);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-2xl border transition ${
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer text-left ${
                       isSelected
-                        ? 'border-rose-500 bg-rose-500/10'
-                        : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/60'
+                        ? 'border-rose-500 bg-rose-500/15 shadow-md shadow-rose-500/10'
+                        : 'border-slate-800/80 bg-slate-900/60 hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${wp.gradient} flex items-center justify-center text-xl shadow-md`}>
-                        {wp.emoji}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${wp.bgGradient} flex items-center justify-center text-2xl shadow-md shrink-0 border border-white/10`}>
+                          {wp.emoji}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <span className="font-bold text-sm text-white">
+                              {amharic && wp.nameAm ? wp.nameAm : wp.name}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              {wp.badge}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 italic mt-1 line-clamp-2">
+                            "{amharic && wp.quoteAm ? wp.quoteAm : wp.quote}"
+                          </p>
+                          {wp.soundMatchId && (
+                            <span className="inline-block mt-1 text-[10px] font-bold text-rose-400">
+                              🎵 {amharic ? 'የሚጣጣም ድምፅ:' : 'Matches sound:'} {RINGTONES_CATALOG.find((t) => t.id === wp.soundMatchId)?.title}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="font-bold text-sm text-white">
-                        {amharic ? wp.nameAm : wp.name}
-                      </span>
+                      {isSelected && <Check className="h-5 w-5 text-rose-400 stroke-[3] shrink-0 mt-1" />}
                     </div>
-                    {isSelected && <Check className="h-5 w-5 text-rose-400 stroke-[3]" />}
-                  </button>
+                  </div>
                 );
               })}
             </div>
           </div>
         </div>
       )}
+
+      {/* Custom Sound Add Modal */}
+      <CustomSoundModal
+        isOpen={showCustomSoundModal}
+        onClose={() => setShowCustomSoundModal(false)}
+        onSoundAdded={handleCustomSoundAdded}
+        language={language}
+      />
 
       <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-[#0b0b0d] via-[#0b0b0d] to-transparent">
         <div className="mx-auto max-w-xl px-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>

@@ -1,3 +1,5 @@
+import { getCachedCustomSound, getCustomSoundById } from './customSounds';
+
 // Web Audio API Synthesizer for Alarms and Ambient Sounds
 
 class AudioEngine {
@@ -8,6 +10,8 @@ class AudioEngine {
   private ambientSources: Map<string, { source: AudioNode; gain: GainNode; stopFn: () => void }> = new Map();
   private volumeLocked: boolean = false;
   private lockedVolumePercent: number = 100;
+  private customAudioEl: HTMLAudioElement | null = null;
+  private customAudioSource: MediaElementAudioSourceNode | null = null;
 
   // ---- Strict volume-lock loudness bus -------------------------------------
   /** Master bus every alarm tone is routed through, so loudness can be forced. */
@@ -109,11 +113,266 @@ class AudioEngine {
       }, 1000);
     }
 
+    if (type.startsWith('custom_')) {
+      const playCustomAudio = (dataUrl: string) => {
+        try {
+          if (this.customAudioEl) {
+            try { this.customAudioEl.pause(); } catch {}
+          }
+          const audio = new Audio(dataUrl);
+          audio.loop = true;
+          const volRatio = Math.max(0.05, Math.min(1, volume / 100));
+          let customCurVol = gentleWakeUp ? 0.05 * volRatio : volRatio;
+          audio.volume = Math.max(0.01, Math.min(1, customCurVol));
+
+          try {
+            const ctx = this.getContext();
+            const alarmOut = this.ensureAlarmBus();
+            const source = ctx.createMediaElementSource(audio);
+            source.connect(alarmOut);
+            this.customAudioSource = source;
+          } catch (e) {
+            // MediaElementSource fallback
+          }
+
+          audio.play().catch((err) => {
+            console.warn('Custom audio playback postponed until user gesture:', err);
+          });
+          this.customAudioEl = audio;
+
+          if (gentleWakeUp) {
+            const startTime = Date.now();
+            if (this.alarmFadeInterval) clearInterval(this.alarmFadeInterval);
+            this.alarmFadeInterval = window.setInterval(() => {
+              const elapsed = (Date.now() - startTime) / 1000;
+              const progress = Math.min(1, elapsed / 30);
+              customCurVol = (0.05 + 0.95 * progress) * volRatio;
+              if (this.customAudioEl) {
+                this.customAudioEl.volume = Math.max(0.01, Math.min(1, customCurVol));
+              }
+              onFadeProgress?.(Math.min(30, Math.floor(elapsed)), Math.round(progress * 100));
+              if (progress >= 1 && this.alarmFadeInterval) {
+                clearInterval(this.alarmFadeInterval);
+                this.alarmFadeInterval = null;
+              }
+            }, 1000);
+          }
+        } catch (err) {
+          console.error('Error starting custom sound:', err);
+        }
+      };
+
+      const cached = getCachedCustomSound(type);
+      if (cached?.dataUrl) {
+        playCustomAudio(cached.dataUrl);
+        return;
+      }
+
+      void getCustomSoundById(type).then((sound) => {
+        if (sound?.dataUrl && this.volumeLocked && this.currentTone?.type === type) {
+          playCustomAudio(sound.dataUrl);
+        } else if (!sound?.dataUrl) {
+          // Fallback tone
+          playToneSequence();
+          this.alarmInterval = window.setInterval(playToneSequence, 2000);
+        }
+      });
+      return;
+    }
+
     const playToneSequence = () => {
       const now = ctx.currentTime;
       const vol = currentVol;
 
-      if (type === 'chime') {
+      if (type === 'wakeup_wakeup') {
+        // "WAKE! UP! WAKE! UP!" - Iconic Alarmy syncopated horn stabs + vocal formant simulation
+        const stabs = [
+          { time: 0.0, freq: 440, duration: 0.18, form: 750 },   // "WAKE!"
+          { time: 0.22, freq: 554, duration: 0.25, form: 1200 },  // "UP!"
+          { time: 0.55, freq: 440, duration: 0.18, form: 750 },   // "WAKE!"
+          { time: 0.77, freq: 659, duration: 0.35, form: 1400 },  // "UP!"
+          { time: 1.20, freq: 880, duration: 0.40, form: 1600 },  // Fanfare climax
+        ];
+        stabs.forEach((s) => {
+          [s.freq, s.freq * 1.5].forEach((f) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const filter = ctx.createBiquadFilter();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(f, now + s.time);
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(s.form, now + s.time);
+            filter.Q.value = 3.5;
+            gain.gain.setValueAtTime(vol * 0.45, now + s.time);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + s.time + s.duration);
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(alarmOut);
+            osc.start(now + s.time);
+            osc.stop(now + s.time + s.duration);
+          });
+        });
+      } else if (type === 'cockadoodledoo') {
+        // Realistic Barnyard Rooster Morning Crow ("coo-coo-coo-cooo-roooo!")
+        const crowParts = [
+          { t: 0.0, f1: 390, f2: 430, dur: 0.14 },
+          { t: 0.16, f1: 440, f2: 520, dur: 0.15 },
+          { t: 0.33, f1: 520, f2: 600, dur: 0.16 },
+          { t: 0.52, f1: 720, f2: 860, dur: 0.95 }, // Long wailing rooster screech
+        ];
+        crowParts.forEach((p) => {
+          [1, 2, 3].forEach((harm) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = harm === 1 ? 'sawtooth' : 'triangle';
+            osc.frequency.setValueAtTime(p.f1 * harm, now + p.t);
+            osc.frequency.exponentialRampToValueAtTime(p.f2 * harm, now + p.t + p.dur);
+            const level = (vol * 0.4) / harm;
+            gain.gain.setValueAtTime(level, now + p.t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + p.t + p.dur);
+            osc.connect(gain);
+            gain.connect(alarmOut);
+            osc.start(now + p.t);
+            osc.stop(now + p.t + p.dur);
+          });
+        });
+      } else if (type === 'lazy' || type === 'lazy_alarm') {
+        // "Wake Up You Lazy!" Heavy 808 Sub-kick + Insistent Warning Bass Grooves
+        const sub = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(140, now);
+        sub.frequency.exponentialRampToValueAtTime(38, now + 0.35);
+        subGain.gain.setValueAtTime(vol * 0.55, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        sub.connect(subGain);
+        subGain.connect(alarmOut);
+        sub.start(now);
+        sub.stop(now + 0.4);
+
+        [0.15, 0.35, 0.55, 0.75, 0.95, 1.15].forEach((t, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          const pitch = [330, 440, 554, 660, 440, 880][i % 6];
+          osc.frequency.setValueAtTime(pitch, now + t);
+          gain.gain.setValueAtTime(vol * 0.35, now + t);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.14);
+          osc.connect(gain);
+          gain.connect(alarmOut);
+          osc.start(now + t);
+          osc.stop(now + t + 0.14);
+        });
+      } else if (type === 'rise_shine') {
+        // "Rise & Shine Mothertrucker" Funky Brass Horn Stabs
+        const notes = [
+          { t: 0.0, f: [293.66, 369.99, 440] },
+          { t: 0.18, f: [369.99, 440, 587.33] },
+          { t: 0.38, f: [440, 554.37, 659.25] },
+          { t: 0.65, f: [587.33, 739.99, 880] },
+          { t: 0.95, f: [440, 587.33, 880, 1174.66] }
+        ];
+        notes.forEach((chord) => {
+          chord.f.forEach((freq) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + chord.t);
+            gain.gain.setValueAtTime(vol * 0.28, now + chord.t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + chord.t + 0.25);
+            osc.connect(gain);
+            gain.connect(alarmOut);
+            osc.start(now + chord.t);
+            osc.stop(now + chord.t + 0.25);
+          });
+        });
+      } else if (type === 'are_you_sleeping') {
+        // "Are You Still Sleeping?!" Rapid question-inflection warning pings
+        [0, 0.18, 0.45, 0.63, 0.95, 1.2].forEach((t, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          const startF = 600 + (i % 2) * 200;
+          const endF = startF + 400;
+          osc.frequency.setValueAtTime(startF, now + t);
+          osc.frequency.exponentialRampToValueAtTime(endF, now + t + 0.12);
+          gain.gain.setValueAtTime(vol * 0.35, now + t);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.14);
+          osc.connect(gain);
+          gain.connect(alarmOut);
+          osc.start(now + t);
+          osc.stop(now + t + 0.14);
+        });
+      } else if (type === 'end_of_world') {
+        // "End of the World Apocalypse" Sub-Bass rumble + Screaming Filtered Siren
+        const sub = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        sub.type = 'sawtooth';
+        sub.frequency.setValueAtTime(55, now);
+        sub.frequency.linearRampToValueAtTime(45, now + 1.5);
+        subGain.gain.setValueAtTime(vol * 0.4, now);
+        subGain.gain.linearRampToValueAtTime(0.001, now + 1.5);
+        sub.connect(subGain);
+        subGain.connect(alarmOut);
+        sub.start(now);
+        sub.stop(now + 1.5);
+
+        const scream = ctx.createOscillator();
+        const screamGain = ctx.createGain();
+        scream.type = 'sawtooth';
+        scream.frequency.setValueAtTime(1800, now);
+        scream.frequency.exponentialRampToValueAtTime(450, now + 0.8);
+        scream.frequency.exponentialRampToValueAtTime(1600, now + 1.4);
+        screamGain.gain.setValueAtTime(vol * 0.45, now);
+        screamGain.gain.linearRampToValueAtTime(0.001, now + 1.5);
+        scream.connect(screamGain);
+        screamGain.connect(alarmOut);
+        scream.start(now);
+        scream.stop(now + 1.5);
+      } else if (type === 'air_raid') {
+        // Extreme Air Raid Siren Strobe (Oscillating wail)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.linearRampToValueAtTime(1400, now + 0.4);
+        osc.frequency.linearRampToValueAtTime(750, now + 0.8);
+        osc.frequency.linearRampToValueAtTime(1400, now + 1.2);
+        gain.gain.setValueAtTime(vol * 0.5, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.5, now + 1.3);
+        gain.gain.linearRampToValueAtTime(0.001, now + 1.4);
+        osc.connect(gain);
+        gain.connect(alarmOut);
+        osc.start(now);
+        osc.stop(now + 1.4);
+      } else if (type === 'first_of_month') {
+        // "First of the Month" 808 Trap Drill Beat
+        const kick = ctx.createOscillator();
+        const kickGain = ctx.createGain();
+        kick.type = 'sine';
+        kick.frequency.setValueAtTime(120, now);
+        kick.frequency.exponentialRampToValueAtTime(42, now + 0.25);
+        kickGain.gain.setValueAtTime(vol * 0.6, now);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        kick.connect(kickGain);
+        kickGain.connect(alarmOut);
+        kick.start(now);
+        kick.stop(now + 0.35);
+
+        [0, 0.12, 0.24, 0.36, 0.48, 0.60, 0.72].forEach((t, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          const notes = [587.33, 739.99, 880.00, 1174.66, 880.00, 739.99, 587.33];
+          osc.frequency.setValueAtTime(notes[i], now + t);
+          gain.gain.setValueAtTime(vol * 0.3, now + t);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.1);
+          osc.connect(gain);
+          gain.connect(alarmOut);
+          osc.start(now + t);
+          osc.stop(now + t + 0.1);
+        });
+      } else if (type === 'chime') {
         const freqs = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
         freqs.forEach((f, i) => {
           const osc = ctx.createOscillator();
@@ -496,6 +755,19 @@ class AudioEngine {
         navigator.mediaSession.setActionHandler('nexttrack', null);
       } catch (e) {}
     }
+    if (this.customAudioEl) {
+      try {
+        this.customAudioEl.pause();
+        this.customAudioEl.currentTime = 0;
+      } catch {}
+      this.customAudioEl = null;
+    }
+    if (this.customAudioSource) {
+      try {
+        this.customAudioSource.disconnect();
+      } catch {}
+      this.customAudioSource = null;
+    }
     if (this.alarmInterval) {
       clearInterval(this.alarmInterval);
       this.alarmInterval = null;
@@ -561,8 +833,20 @@ class AudioEngine {
         }
       }
 
+      if (this.customAudioEl) {
+        if (this.customAudioEl.paused && this.volumeLocked) {
+          this.customAudioEl.play().catch(() => {});
+        }
+        const level = Math.max(0, Math.min(3, this.escalationLevel));
+        const boost = AudioEngine.ESCALATION_BOOST[level] ?? 1;
+        this.customAudioEl.volume = Math.max(
+          0.05,
+          Math.min(1, (this.lockedVolumePercent / 100) * boost)
+        );
+      }
+
       // Re-arm the tone loop if something cleared it while ringing.
-      if (this.volumeLocked && !this.alarmInterval && ctx) {
+      if (this.volumeLocked && !this.alarmInterval && !this.customAudioEl && ctx) {
         // The interval callback is intentionally not stored, so re-create it
         // from the currently configured alarm tone.
         if (this.currentTone) {

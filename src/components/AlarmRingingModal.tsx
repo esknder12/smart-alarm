@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Alarm, ChallengeType } from '../types';
+import { Alarm, ChallengeType, RINGTONES_CATALOG } from '../types';
 import { audioEngine } from '../utils/audio';
 import {
   volumeLock,
@@ -12,7 +12,8 @@ import {
 import { nativeAlarmScheduler } from '../utils/alarmScheduler';
 import { WALLPAPERS } from './AlarmClock';
 import { Language } from '../utils/translations';
-import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX } from 'lucide-react';
+import { getCachedCustomSound, getCustomSoundById } from '../utils/customSounds';
+import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX, Music } from 'lucide-react';
 
 interface AlarmRingingModalProps {
   alarm: Alarm;
@@ -82,7 +83,31 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
   const [fadeProgressSec, setFadeProgressSec] = useState<number>(0);
   const [currentVolumePercent, setCurrentVolumePercent] = useState<number>(alarm.gentleWakeUp ? 5 : alarm.volume);
 
-  const activeWallpaper = WALLPAPERS.find((w) => w.id === alarm.wallpaper) || WALLPAPERS[0];
+  const activeWallpaper =
+    WALLPAPERS.find((w) => w.id === alarm.wallpaper) ||
+    (alarm.wallpaper === 'capybara' ? WALLPAPERS.find((w) => w.id === 'chill_capybara') : null) ||
+    (alarm.wallpaper === 'cat' ? WALLPAPERS.find((w) => w.id === 'lazy_cat') : null) ||
+    (alarm.wallpaper === 'motivation' ? WALLPAPERS.find((w) => w.id === 'rise_and_grind') : null) ||
+    (alarm.wallpaper === 'nature' ? WALLPAPERS.find((w) => w.id === 'cockadoodle') : null) ||
+    WALLPAPERS[0];
+
+  const [customSoundName, setCustomSoundName] = useState<string | null>(() => {
+    const cached = getCachedCustomSound(alarm.sound);
+    return cached?.name ?? null;
+  });
+
+  useEffect(() => {
+    if (alarm.sound.startsWith('custom_') && !customSoundName) {
+      void getCustomSoundById(alarm.sound).then((sound) => {
+        if (sound?.name) setCustomSoundName(sound.name);
+      });
+    }
+  }, [alarm.sound, customSoundName]);
+
+  const catalogTone = RINGTONES_CATALOG.find((r) => r.id === alarm.sound);
+  const soundDisplayName = customSoundName
+    ? `🎵 ${customSoundName}`
+    : catalogTone?.title ?? alarm.sound;
 
   useEffect(() => {
     // Start playing alarm audio with optional gentle fade-in
@@ -533,19 +558,28 @@ export const AlarmRingingModal: React.FC<AlarmRingingModalProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Bell Icon with Visual Haptic Ripple Rings */}
-          <div className="relative mx-auto w-20 h-20 mb-4">
-            <span className="absolute inset-0 rounded-full bg-slate-700/30 animate-ping pointer-events-none" />
-            <div className="w-20 h-20 rounded-full bg-slate-800 text-white flex items-center justify-center ring-8 ring-slate-700/30 animate-bounce relative z-10">
-              <BellRing className="w-10 h-10 text-white" />
+          {/* Funny / Wake-Up Wallpaper Theme Banner */}
+          <div className="mb-4 p-4 rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-md shadow-2xl text-center space-y-2 relative overflow-hidden">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-black uppercase tracking-wider animate-pulse">
+              <span>{activeWallpaper.badge || '🔥 WAKE UP WAKE UP!'}</span>
+            </div>
+            <div className="text-5xl animate-bounce pt-1 drop-shadow-md select-none">
+              {activeWallpaper.emoji || '🚨'}
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              {alarm.label || (isAm ? 'የመነቂያ ሰዓት!' : 'WAKE UP!')}
+            </h2>
+            <p className="text-amber-300 font-bold text-xs italic px-2 leading-relaxed">
+              "{isAm && activeWallpaper.quoteAm ? activeWallpaper.quoteAm : (activeWallpaper.quote || 'THIS IS NOT A DRILL! Get your body out of bed right now!')}"
+            </p>
+            <p className="text-slate-400 text-[11px]">{isAm ? 'የተያዘለት ሰዓት:' : 'Scheduled for:'} {alarm.time}</p>
+            <div className="pt-1">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700/80 text-slate-200 text-xs font-bold shadow-md">
+                <span className="text-rose-400 animate-pulse">🔊</span>
+                <span className="truncate max-w-[260px]">{soundDisplayName}</span>
+              </div>
             </div>
           </div>
-
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">{alarm.label || (isAm ? 'የመነቂያ ሰዓት!' : 'Wake-up Time!')}</h2>
-          {activeWallpaper.quote && (
-            <p className="text-amber-300/90 text-xs italic mt-1 px-4">"{activeWallpaper.quote}"</p>
-          )}
-          <p className="text-slate-400 text-xs mt-1">{isAm ? 'የተያዘለት ሰዓት:' : 'Scheduled for:'} {alarm.time}</p>
 
           {/* Current Time Big Display */}
           <div className="my-5 py-4 bg-slate-950/70 rounded-2xl border border-slate-800/80 shadow-inner">

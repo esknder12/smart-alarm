@@ -4,27 +4,31 @@ const INITIAL_ALARMS: Alarm[] = [
   {
     id: '1',
     time: '06:30',
-    label: 'Morning Rise & Shine',
+    label: 'WAKE UP! WAKE UP! 🔥',
     enabled: true,
     repeatDays: [1, 2, 3, 4, 5], // Mon-Fri
-    sound: 'sunrise',
-    volume: 80,
+    sound: 'wakeup_wakeup',
+    volume: 85,
+    gentleWakeUp: true,
+    wallpaper: 'wakeup_rage',
     snoozeCount: 0,
     challenge: 'math',
-    challengeDifficulty: 'easy'
+    challengeDifficulty: 'easy',
   },
   {
     id: '2',
     time: '07:15',
-    label: 'Weekend Workout Wakeup',
+    label: 'Wake Up You Lazy! 😴',
     enabled: false,
     repeatDays: [0, 6], // Sat, Sun
-    sound: 'chime',
-    volume: 75,
+    sound: 'lazy',
+    volume: 80,
+    gentleWakeUp: false,
+    wallpaper: 'lazy_cat',
     snoozeCount: 0,
     challenge: 'typing',
-    challengeDifficulty: 'easy'
-  }
+    challengeDifficulty: 'easy',
+  },
 ];
 
 /**

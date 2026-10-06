@@ -43,15 +43,13 @@ import {
 interface SettingsViewProps {
   language: Language;
   setLanguage: (lang: Language) => void;
-  onLaunchNightstand: () => void;
-  onRelaunchTour: () => void;
+  onLaunchNightstand?: () => void;
+  onRelaunchTour?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   language,
   setLanguage,
-  onLaunchNightstand,
-  onRelaunchTour,
 }) => {
   const t = translations[language];
   const isAm = language === 'am';
@@ -143,17 +141,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Main Settings List Group 1 */}
       <div className="space-y-4 pt-1">
-        {/* Alarm optimization */}
-        <button
-          onClick={() => setActiveModal('optimization')}
-          className="w-full p-4 bg-[#18191d] hover:bg-[#202127] border border-slate-800/80 rounded-2xl flex items-center justify-between transition text-left group"
-        >
-          <span className="font-bold text-sm text-slate-100 group-hover:text-white">
-            {isAm ? 'የማንቂያ ማሻሻያ' : 'Alarm Optimization'}
-          </span>
-          <ChevronRight className="w-5 h-5 text-slate-500" />
-        </button>
-
         {/* Advanced alarm settings */}
         <button
           onClick={() => setActiveModal('advanced')}
@@ -189,15 +176,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Main Settings List Group 2 */}
       <div className="space-y-4">
-        {/* Sound output */}
-        <button
-          onClick={() => setActiveModal('sound_output')}
-          className="w-full p-4 bg-[#18191d] hover:bg-[#202127] border border-slate-800/80 rounded-2xl flex items-center justify-between transition text-left"
-        >
-          <span className="font-bold text-sm text-slate-100">{isAm ? 'የድምፅ ማውጫ' : 'Sound Output'}</span>
-          <span className="text-xs text-slate-400 font-medium">{soundOutput}</span>
-        </button>
-
         {/* Notification setting */}
         <button
           onClick={() => setActiveModal('notifications')}
@@ -236,79 +214,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </button>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-800/80 my-4" />
 
-      {/* Group 3: Help, FAQ, Feedback, About */}
-      <div className="space-y-3">
-        {/* Notices */}
-        <button
-          onClick={() => setActiveModal('notices')}
-          className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200"
-        >
-          <div className="flex items-center space-x-2 font-bold text-sm">
-            <span>{isAm ? 'ማስታወቂያዎች' : 'Notices & Announcements'}</span>
-            <span className="w-2 h-2 rounded-full bg-red-500" />
-          </div>
-        </button>
-
-        {/* FAQ */}
-        <button
-          onClick={() => setActiveModal('faq')}
-          className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
-        >
-          <span>{isAm ? 'ተደጋግመው የሚጠየቁ ጥያቄዎች (FAQ)' : 'Frequently Asked Questions (FAQ)'}</span>
-        </button>
-
-        {/* Send feedback */}
-        <button
-          onClick={() => setActiveModal('feedback')}
-          className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
-        >
-          <span>{isAm ? 'አስተያየት ይላኩ' : 'Send Feedback'}</span>
-        </button>
-
-        {/* Copyright infringement report */}
-        <button
-          onClick={() => setActiveModal('copyright')}
-          className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
-        >
-          <span>{isAm ? 'የቅጂ መብት ጥሰት ሪፖርት' : 'Copyright Infringement Report'}</span>
-        </button>
-
-        {/* About */}
-        <button
-          onClick={() => setActiveModal('about')}
-          className="w-full py-3 px-2 flex items-center justify-between hover:text-white transition text-left text-slate-200 font-bold text-sm"
-        >
-          <span>{isAm ? 'ስለ መተግበሪያው' : 'About Application'}</span>
-        </button>
-      </div>
-
-      {/* Extra Launch Utilities */}
-      <div className="pt-4 space-y-2">
-        <button
-          onClick={onLaunchNightstand}
-          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-red-400 hover:border-red-500/40 transition"
-        >
-          <div className="flex items-center space-x-2">
-            <Moon className="w-4 h-4" />
-            <span>{isAm ? 'የአልጋ አጠገብ ሰዓት ሁነታን ክፈት' : 'Launch Nightstand Clock Mode'}</span>
-          </div>
-          <span>🌙</span>
-        </button>
-
-        <button
-          onClick={onRelaunchTour}
-          className="w-full bg-[#1e2026] border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between text-left text-xs font-bold text-red-400 hover:border-red-500/40 transition"
-        >
-          <div className="flex items-center space-x-2">
-            <Zap className="w-4 h-4" />
-            <span>{isAm ? 'የመተግበሪያ መመሪያውን እንደገና ክፈት' : 'Relaunch Setup Wizard Tour'}</span>
-          </div>
-          <span>🚀</span>
-        </button>
-      </div>
 
       {/* Dynamic Settings Modals */}
       <AnimatePresence>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SoundType, RINGTONES_CATALOG } from '../types';
+import { SoundType, RINGTONES_CATALOG, CustomSound } from '../types';
 import { X, Clock, Zap, Volume2, RotateCcw, Check, Music } from 'lucide-react';
 import { audioEngine } from '../utils/audio';
 import { Language } from '../utils/translations';
+import { getCustomSounds, getCachedCustomSounds } from '../utils/customSounds';
 
 interface QuickAlarmModalProps {
   isOpen: boolean;
@@ -19,10 +20,15 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
   language = 'en',
 }) => {
   const [minutes, setMinutes] = useState<number>(10);
-  const [sound, setSound] = useState<SoundType>('radar');
+  const [sound, setSound] = useState<SoundType>('wakeup_wakeup');
   const [volume, setVolume] = useState<number>(80);
   const [vibrate, setVibrate] = useState<boolean>(true);
+  const [customSounds, setCustomSounds] = useState<CustomSound[]>(() => getCachedCustomSounds());
   const isAm = language === 'am';
+
+  useEffect(() => {
+    void getCustomSounds().then((sounds) => setCustomSounds(sounds));
+  }, []);
 
   // Calculate projected ring time
   const [ringTimeStr, setRingTimeStr] = useState<string>('');
@@ -150,13 +156,24 @@ export const QuickAlarmModal: React.FC<QuickAlarmModalProps> = ({
                 <select
                   value={sound}
                   onChange={(e) => setSound(e.target.value as SoundType)}
-                  className="bg-slate-900 text-slate-200 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
+                  className="bg-slate-900 text-slate-200 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none max-w-[200px] truncate"
                 >
-                  {RINGTONES_CATALOG.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.emoji} {r.title}
-                    </option>
-                  ))}
+                  {customSounds.length > 0 && (
+                    <optgroup label={isAm ? 'ብጁ ድምጾች' : 'Custom Sounds'}>
+                      {customSounds.map((cs) => (
+                        <option key={cs.id} value={cs.id}>
+                          🎵 {cs.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label={isAm ? 'የደወል ድምጾች' : 'Ringtones'}>
+                    {RINGTONES_CATALOG.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.emoji} {r.title}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
             </div>

@@ -52,96 +52,103 @@ export interface ThemeOption {
 
 export const THEMES_DATA: ThemeOption[] = [
   {
-    id: 'nature',
-    name: 'A sunrise over misty forest',
+    id: 'wakeup_rage',
+    name: 'WAKE UP! WAKE UP!',
     category: 'Trending',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Sunrise Birds',
-    soundId: 'birds' as SoundType,
-    imageEmoji: '🌅',
+    bgGradient: 'bg-gradient-to-br from-rose-600 to-amber-500',
+    soundTag: 'Emergency Call',
+    soundId: 'wakeup_wakeup',
+    imageEmoji: '🚨',
   },
   {
-    id: 'motivation',
-    name: 'A discipline archway',
+    id: 'lazy_cat',
+    name: 'Five More Minutes? NO!',
     category: 'Trending',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Heavy Brass',
-    soundId: 'radar' as SoundType,
-    imageEmoji: '🏛️',
+    bgGradient: 'bg-gradient-to-br from-purple-900 to-pink-500',
+    soundTag: 'Cat Trap',
+    soundId: 'catmeow',
+    imageEmoji: '😼',
   },
   {
-    id: 'capybara',
-    name: 'Mindful Peace pose',
+    id: 'cockadoodle',
+    name: 'Screaming Rooster Call',
     category: 'Trending',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Gentle Flute',
-    soundId: 'chime' as SoundType,
-    imageEmoji: '🧘',
+    bgGradient: 'bg-gradient-to-br from-amber-600 to-red-600',
+    soundTag: 'Morning Crow',
+    soundId: 'cockadoodledoo',
+    imageEmoji: '🐓',
   },
   {
-    id: 'space',
-    name: 'Goal Focus Lotus Lake',
+    id: 'coffee_emergency',
+    name: 'Code Red: Needs Coffee',
     category: 'Goal Focus',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Focus Ambient',
-    soundId: 'digital' as SoundType,
-    imageEmoji: '🪷',
+    bgGradient: 'bg-gradient-to-br from-amber-950 to-amber-600',
+    soundTag: 'Caffeine Emergency',
+    soundId: 'lazy',
+    imageEmoji: '☕',
   },
   {
-    id: 'cat',
-    name: 'Mountain Peak Dawn',
+    id: 'chill_capybara',
+    name: 'Capybara Zen Sunrise',
     category: 'Goal Focus',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Morning Breeze',
-    soundId: 'sunrise' as SoundType,
-    imageEmoji: '🏔️',
+    bgGradient: 'bg-gradient-to-br from-teal-950 to-emerald-600',
+    soundTag: 'Chill Groove',
+    soundId: 'capybara',
+    imageEmoji: '🦫',
   },
   {
-    id: 'default',
-    name: 'Cosmic Horizon',
+    id: 'nuclear_warning',
+    name: 'DEFCON 1: Biohazard Alarm',
     category: 'Goal Focus',
-    bgGradient: 'bg-[#18191d]',
-    soundTag: 'Deep Space',
-    soundId: 'chime' as SoundType,
-    imageEmoji: '🌌',
+    bgGradient: 'bg-gradient-to-br from-lime-950 to-yellow-600',
+    soundTag: 'Nuclear Siren',
+    soundId: 'nuclear',
+    imageEmoji: '☢️',
   },
 ];
 
 export const AUDIO_TRACKS = [
   {
+    id: 'wakeup_wakeup' as SoundType,
+    title: 'WAKE UP! WAKE UP!',
+    subtitle: 'Iconic Alarmy Wake Up Call',
+    tag: '🔥 Top Trending',
+    emoji: '🗣️',
+  },
+  {
+    id: 'cockadoodledoo' as SoundType,
+    title: 'Cock-a-Doodle-Doo Rooster',
+    subtitle: 'Loud Barnyard Crow',
+    tag: '⚡ Viral',
+    emoji: '🐓',
+  },
+  {
+    id: 'lazy' as SoundType,
+    title: 'Wake Up You Lazy!',
+    subtitle: 'Insistent Vocal & Heavy Bass',
+    tag: '📢 Loud',
+    emoji: '😴',
+  },
+  {
+    id: 'nuclear' as SoundType,
+    title: 'Nuclear Warning Siren',
+    subtitle: 'Dual Sawtooth Max Decibel',
+    tag: '⚠️ Extreme',
+    emoji: '☢️',
+  },
+  {
+    id: 'capybara' as SoundType,
+    title: 'Capybara Sunrise Groove',
+    subtitle: 'Viral Chill Bouncy Pop',
+    tag: '✨ Chill',
+    emoji: '🦫',
+  },
+  {
     id: 'goodmorning' as SoundType,
-    title: 'Motivational Speech',
-    subtitle: 'Motivational Speech',
-    tag: 'Currently Using',
-    emoji: '🎙️',
-  },
-  {
-    id: 'sunrise' as SoundType,
-    title: 'Inspirational Music',
-    subtitle: 'Calming Nature',
-    tag: 'Calming',
-    emoji: '🌲',
-  },
-  {
-    id: 'piano' as SoundType,
-    title: 'Inspiring Piano',
-    subtitle: 'Inspiring Piano',
-    tag: 'Calming',
-    emoji: '🎹',
-  },
-  {
-    id: 'digital' as SoundType,
-    title: 'Uplifting Beats',
-    subtitle: 'Uplifting Beats',
-    tag: 'Uplifting',
-    emoji: '🎧',
-  },
-  {
-    id: 'chime' as SoundType,
-    title: 'Motivational Sounds',
-    subtitle: 'Energetic Chime',
-    tag: 'Uplifting',
-    emoji: '🔔',
+    title: 'Gooooood Morning Fanfare',
+    subtitle: 'Triumphant Upbeat Horns',
+    tag: 'Upbeat',
+    emoji: '☀️',
   },
 ];
 
@@ -207,14 +214,14 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ onComplete, onCl
     ));
 
   // Theme state
-  const [selectedTheme] = useState<WallpaperId>('nature');
+  const [selectedTheme] = useState<WallpaperId>('wakeup_rage');
 
   // Mission state
   const [selectedMission, setSelectedMission] = useState<ChallengeType>('math');
 
   // Audio state
-  const [audioCategory, setAudioCategory] = useState<SoundCategory>('Trending');
-  const [selectedAudio, setSelectedAudio] = useState<SoundType>('goodmorning');
+  const [audioCategory, setAudioCategory] = useState<SoundCategory>('Wake Up Voice');
+  const [selectedAudio, setSelectedAudio] = useState<SoundType>('wakeup_wakeup');
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
 
   // Alert settings state

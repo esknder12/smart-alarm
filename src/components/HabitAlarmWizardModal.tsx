@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SoundType, ChallengeType, WallpaperId, RINGTONES_CATALOG } from '../types';
+import { SoundType, ChallengeType, WallpaperId, RINGTONES_CATALOG, CustomSound } from '../types';
 import { X, Flame, Plus, Check, Music, Bell, Shield, ArrowRight } from 'lucide-react';
 import { WALLPAPERS } from './AlarmClock';
 import { Language } from '../utils/translations';
+import { getCustomSounds, getCachedCustomSounds } from '../utils/customSounds';
 
 interface HabitAlarmWizardModalProps {
   isOpen: boolean;
@@ -53,9 +54,14 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
   const [alarmTime, setAlarmTime] = useState<string>('07:00');
   const [repeatDays, setRepeatDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]); // Daily
   const [isDaily, setIsDaily] = useState<boolean>(true);
-  const [sound, setSound] = useState<SoundType>('sunrise');
+  const [sound, setSound] = useState<SoundType>('wakeup_wakeup');
   const [challenge, setChallenge] = useState<ChallengeType>('math');
   const [preventPowerOff, setPreventPowerOff] = useState<boolean>(false);
+  const [customSounds, setCustomSounds] = useState<CustomSound[]>(() => getCachedCustomSounds());
+
+  useEffect(() => {
+    void getCustomSounds().then((sounds) => setCustomSounds(sounds));
+  }, []);
 
   if (!isOpen) return null;
 
@@ -315,13 +321,24 @@ export const HabitAlarmWizardModal: React.FC<HabitAlarmWizardModalProps> = ({
                   <select
                     value={sound}
                     onChange={(e) => setSound(e.target.value as SoundType)}
-                    className="bg-slate-900 text-slate-200 border border-slate-700 rounded-xl px-3 py-1 text-xs font-bold"
+                    className="bg-slate-900 text-slate-200 border border-slate-700 rounded-xl px-3 py-1 text-xs font-bold max-w-[190px] truncate"
                   >
-                    {RINGTONES_CATALOG.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.emoji} {r.title}
-                      </option>
-                    ))}
+                    {customSounds.length > 0 && (
+                      <optgroup label={isAm ? 'ብጁ ድምጾች' : 'Custom Sounds'}>
+                        {customSounds.map((cs) => (
+                          <option key={cs.id} value={cs.id}>
+                            🎵 {cs.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label={isAm ? 'የደወል ድምጾች' : 'Ringtones'}>
+                      {RINGTONES_CATALOG.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.emoji} {r.title}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
 

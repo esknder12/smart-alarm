@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption } from '../types';
+import { Alarm, SoundType, ChallengeType, WallpaperId, WallpaperOption, WALLPAPERS_CATALOG } from '../types';
 import { Language, translations } from '../utils/translations';
 import { Plus, Trash2, Bell, Edit2, Calendar, Zap, X, Check } from 'lucide-react';
 import { QuickAlarmModal } from './QuickAlarmModal';
@@ -24,13 +24,7 @@ interface AlarmClockProps {
   onEditorVisibilityChange?: (visible: boolean) => void;
 }
 
-export const WALLPAPERS: WallpaperOption[] = [
-  { id: 'default', name: 'Cosmic Dark', category: 'Trending', bgGradient: 'bg-[#18191d]' },
-  { id: 'capybara', name: 'Capybara Chill Sunrise', category: 'Trending', bgGradient: 'bg-[#18191d]', quote: 'Be like the capybara: calm, cool, and peaceful.' },
-  { id: 'motivation', name: 'Daily Power Focus', category: 'Daily Motivation', bgGradient: 'bg-[#18191d]', quote: 'Small daily steps create extraordinary lifelong results.' },
-  { id: 'space', name: 'Into Space Nebula', category: 'Into Space', bgGradient: 'bg-[#18191d]', quote: 'Reach for the stars; your potential is infinite.' },
-  { id: 'nature', name: 'Misty Forest Dew', category: 'Trending', bgGradient: 'bg-[#18191d]', quote: 'Breathe deep and embrace nature\'s morning peace.' },
-];
+export const WALLPAPERS: WallpaperOption[] = WALLPAPERS_CATALOG;
 
 export const AlarmClock: React.FC<AlarmClockProps> = ({
   alarms,
@@ -54,10 +48,10 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   const [time, setTime] = useState('07:00');
   const [label, setLabel] = useState('Morning Wake Up');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [sound, setSound] = useState<SoundType>('sunrise');
+  const [sound, setSound] = useState<SoundType>('wakeup_wakeup');
   const [volume, setVolume] = useState(80);
   const [gentleWakeUp, setGentleWakeUp] = useState(true);
-  const [wallpaper, setWallpaper] = useState<WallpaperId>('capybara');
+  const [wallpaper, setWallpaper] = useState<WallpaperId>('wakeup_rage');
   const [snoozeInterval, setSnoozeInterval] = useState(5);
   const [snoozeLimit, setSnoozeLimit] = useState(3);
   const [challenge, setChallenge] = useState<ChallengeType>('math');
@@ -95,7 +89,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
       sound: quickSound,
       volume: quickVolume,
       gentleWakeUp: true,
-      wallpaper: 'capybara',
+      wallpaper: 'wakeup_rage',
       challenge: 'math',
       challengeDifficulty: 'easy',
     });
@@ -117,7 +111,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
       sound: habitSound,
       volume: 80,
       gentleWakeUp: true,
-      wallpaper: 'capybara',
+      wallpaper: 'wakeup_rage',
       challenge: habitChallenge,
       challengeDifficulty: 'easy',
     });
@@ -128,10 +122,10 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setTime('07:00');
     setLabel('Morning Wake Up');
     setRepeatDays([1, 2, 3, 4, 5]);
-    setSound('sunrise');
+    setSound('wakeup_wakeup');
     setVolume(80);
     setGentleWakeUp(true);
-    setWallpaper('capybara');
+    setWallpaper('wakeup_rage');
     setSnoozeInterval(5);
     setSnoozeLimit(3);
     setChallenge('math');
@@ -148,7 +142,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setSound(alarm.sound);
     setVolume(alarm.volume);
     setGentleWakeUp(alarm.gentleWakeUp ?? true);
-    setWallpaper(alarm.wallpaper ?? 'capybara');
+    setWallpaper(alarm.wallpaper ?? 'wakeup_rage');
     setSnoozeInterval(alarm.snoozeInterval ?? 5);
     setSnoozeLimit(alarm.snoozeLimit ?? 3);
     setChallenge(alarm.challenge);
