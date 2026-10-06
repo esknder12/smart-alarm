@@ -290,6 +290,8 @@ export interface Alarm {
   challenge: ChallengeType;
   challengeDifficulty: 'easy' | 'medium' | 'hard';
   challengeConfig?: {
+    /** Exact barcode / QR payload saved before bed; compared locally when the alarm rings. */
+    barcodeValue?: string;
     barcodeTarget?: string;
     targetSquats?: number;
     targetSteps?: number;

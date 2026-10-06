@@ -80,6 +80,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Live QR / barcode scan in the alarm mission (frames are decoded locally, never uploaded). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <!-- Ringing while the app is closed -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

@@ -54,7 +54,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   const [wallpaper, setWallpaper] = useState<WallpaperId>('wakeup_rage');
   const [snoozeInterval, setSnoozeInterval] = useState(5);
   const [snoozeLimit, setSnoozeLimit] = useState(3);
-  const [challenge, setChallenge] = useState<ChallengeType>('barcode');
+  const [challenge, setChallenge] = useState<ChallengeType>('combo');
   const [challengeDifficulty, setChallengeDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [challengeConfig, setChallengeConfig] = useState<Alarm['challengeConfig']>({
     barcodeTarget: 'Bathroom Toothpaste',
@@ -135,7 +135,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setWallpaper('wakeup_rage');
     setSnoozeInterval(5);
     setSnoozeLimit(3);
-    setChallenge('barcode');
+    setChallenge('combo');
     setChallengeDifficulty('easy');
     setChallengeConfig({
       barcodeTarget: 'Bathroom Toothpaste',

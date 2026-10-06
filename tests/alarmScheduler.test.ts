@@ -85,6 +85,8 @@
   check('mapping: time is split into hour/minute', mapped.hour === 7 && mapped.minute === 15);
   check('mapping: repeat days are de-duplicated and sorted', JSON.stringify(mapped.days) === '[0,1,6]', JSON.stringify(mapped.days));
   check('mapping: volume is clamped to 0-100', mapped.volume === 100);
+  check('mapping: barcode target is carried into the native scheduler', toNativeAlarm(alarm({ challengeConfig: { barcodeValue: '0012345678905' } })).barcodeValue === '0012345678905');
+  check('mapping: oversized QR payloads stay within the native record limit', toNativeAlarm(alarm({ challengeConfig: { barcodeValue: 'x'.repeat(2049) } })).barcodeValue?.length === 2048);
   check('mapping: a one-time alarm sends no days', toNativeAlarm(alarm({ repeatDays: [] })).days.length === 0);
   const bare = toNativeAlarm({ id: 7, time: '05:00', enabled: false } as any);
   check(
@@ -96,13 +98,13 @@
   const stored = alarm({ id: 'a1', label: 'Stored', wallpaper: 'space' });
   const ringInfo = {
     alarmId: 'a1', label: 'Native', time: '06:30', hour: 6, minute: 30, sound: 'nuclear', volume: 55,
-    gentleWakeUp: true, challenge: 'typing', challengeDifficulty: 'hard', startedAt: 1, ringingSeconds: 3,
+    gentleWakeUp: true, challenge: 'typing', challengeDifficulty: 'hard', barcodeValue: 'saved-code', startedAt: 1, ringingSeconds: 3,
   } as any;
   check('ring: the stored alarm is used when it still exists (wallpaper & mission kept)', alarmFromRingInfo(ringInfo, [alarm(), stored]) === stored);
   const rebuilt = alarmFromRingInfo(ringInfo, [alarm({ id: 'other' })]);
   check(
     'ring: a ring survives local storage being cleared',
-    rebuilt.id === 'a1' && rebuilt.time === '06:30' && rebuilt.label === 'Native' && rebuilt.challenge === 'typing' && rebuilt.challengeDifficulty === 'hard' && rebuilt.volume === 55 && rebuilt.gentleWakeUp === true
+    rebuilt.id === 'a1' && rebuilt.time === '06:30' && rebuilt.label === 'Native' && rebuilt.challenge === 'typing' && rebuilt.challengeDifficulty === 'hard' && rebuilt.volume === 55 && rebuilt.gentleWakeUp === true && rebuilt.challengeConfig?.barcodeValue === 'saved-code'
   );
   check('ring: a missing label still yields a title', alarmFromRingInfo({ ...ringInfo, label: '' }, []).label === 'Alarm');
   check('constants: the app name resolves (used by the ringing copy)', typeof APP_NAME === 'string' && APP_NAME.length > 0);

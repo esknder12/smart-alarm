@@ -19,10 +19,12 @@ import java.util.List;
  */
 final class AlarmSchedule {
 
-    /** Codec version; record 0 must match or the record is ignored. */
-    static final String VERSION = "v1";
+    /** Current codec version. Decoding still accepts v1 alarms created before barcode locking. */
+    static final String VERSION = "v2";
+    private static final String LEGACY_VERSION = "v1";
     private static final char FIELD = '|';
-    private static final int FIELD_COUNT = 12;
+    private static final int FIELD_COUNT = 13;
+    private static final int LEGACY_FIELD_COUNT = 12;
 
     final String id;
     final int hour;
@@ -36,6 +38,8 @@ final class AlarmSchedule {
     final boolean gentleWakeUp;
     final String challenge;
     final String challengeDifficulty;
+    /** Exact barcode / QR payload used by the wake-up mission; never a camera image. */
+    final String barcodeValue;
     final boolean enabled;
 
     AlarmSchedule(
@@ -49,6 +53,7 @@ final class AlarmSchedule {
         boolean gentleWakeUp,
         String challenge,
         String challengeDifficulty,
+        String barcodeValue,
         boolean enabled
     ) {
         this.id = id == null ? "" : id;
@@ -65,10 +70,11 @@ final class AlarmSchedule {
         this.gentleWakeUp = gentleWakeUp;
         this.challenge = challenge == null ? "math" : challenge;
         this.challengeDifficulty = challengeDifficulty == null ? "easy" : challengeDifficulty;
+        this.barcodeValue = barcodeValue == null ? "" : barcodeValue;
         this.enabled = enabled;
     }
 
-    /** Convenience for the tests and for the plugin, which receives the days as a JSON array. */
+    /** Convenience overload retained for callers and records that have no saved scan target. */
     static AlarmSchedule fromDayList(
         String id,
         int hour,
@@ -80,6 +86,24 @@ final class AlarmSchedule {
         boolean gentleWakeUp,
         String challenge,
         String challengeDifficulty,
+        boolean enabled
+    ) {
+        return fromDayList(id, hour, minute, repeatDays, label, sound, volume, gentleWakeUp, challenge, challengeDifficulty, "", enabled);
+    }
+
+    /** Convenience for the plugin, which receives the days and challenge target as JSON values. */
+    static AlarmSchedule fromDayList(
+        String id,
+        int hour,
+        int minute,
+        List<Integer> repeatDays,
+        String label,
+        String sound,
+        int volume,
+        boolean gentleWakeUp,
+        String challenge,
+        String challengeDifficulty,
+        String barcodeValue,
         boolean enabled
     ) {
         boolean[] days = new boolean[7];
@@ -101,6 +125,7 @@ final class AlarmSchedule {
             gentleWakeUp,
             challenge,
             challengeDifficulty,
+            barcodeValue,
             enabled
         );
     }
@@ -141,6 +166,7 @@ final class AlarmSchedule {
             gentleWakeUp,
             challenge,
             challengeDifficulty,
+            barcodeValue,
             shouldBeEnabled
         );
     }
@@ -176,7 +202,8 @@ final class AlarmSchedule {
         out.append(gentleWakeUp ? 1 : 0).append(FIELD);
         out.append(escape(challenge)).append(FIELD);
         out.append(escape(challengeDifficulty)).append(FIELD);
-        out.append(enabled ? 1 : 0);
+        out.append(enabled ? 1 : 0).append(FIELD);
+        out.append(escape(barcodeValue));
         return out.toString();
     }
 
@@ -184,7 +211,8 @@ final class AlarmSchedule {
     static AlarmSchedule decode(String encoded) {
         if (encoded == null) return null;
         String[] parts = encoded.split("\\|", -1);
-        if (parts.length != FIELD_COUNT || !VERSION.equals(parts[0])) return null;
+        boolean legacy = LEGACY_VERSION.equals(parts[0]);
+        if (legacy ? parts.length != LEGACY_FIELD_COUNT : parts.length != FIELD_COUNT || !VERSION.equals(parts[0])) return null;
         try {
             boolean[] days = new boolean[7];
             if (!"-".equals(parts[4])) {
@@ -205,6 +233,7 @@ final class AlarmSchedule {
                 "1".equals(parts[8]),
                 unescape(parts[9]),
                 unescape(parts[10]),
+                legacy ? "" : unescape(parts[12]),
                 "1".equals(parts[11])
             );
         } catch (RuntimeException broken) {

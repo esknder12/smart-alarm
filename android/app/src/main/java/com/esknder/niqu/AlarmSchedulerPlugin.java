@@ -215,6 +215,7 @@ public class AlarmSchedulerPlugin extends Plugin {
         out.put("gentleWakeUp", snapshot.alarm.gentleWakeUp);
         out.put("challenge", snapshot.alarm.challenge);
         out.put("challengeDifficulty", snapshot.alarm.challengeDifficulty);
+        out.put("barcodeValue", snapshot.alarm.barcodeValue);
         out.put("startedAt", snapshot.startedAtMillis);
         out.put("ringingSeconds", snapshot.ringingSeconds(System.currentTimeMillis()));
         return out;
@@ -262,6 +263,7 @@ public class AlarmSchedulerPlugin extends Plugin {
                     json.optBoolean("gentleWakeUp", false),
                     json.optString("challenge", "math"),
                     json.optString("challengeDifficulty", "easy"),
+                    json.optString("barcodeValue", ""),
                     json.optBoolean("enabled", false)
                 )
             );

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Camera,
   Check,
+  CheckCircle2,
   ChevronRight,
   Dumbbell,
   Footprints,
@@ -11,6 +12,7 @@ import {
   Plus,
   QrCode,
   Square,
+  ShieldCheck,
   Trash2,
   Volume2,
   X,
@@ -22,6 +24,8 @@ import { describeRepeat, nextOccurrence, shortDayName } from '../utils/alarmText
 import { nativeAlarmScheduler } from '../utils/alarmScheduler';
 import { getCustomSounds, deleteCustomSound, getCachedCustomSounds } from '../utils/customSounds';
 import { CustomSoundModal } from './CustomSoundModal';
+import { BarcodeScanner } from './BarcodeScanner';
+import { getMathQuestionCount, isOutOfBedMission, MAX_BARCODE_VALUE_LENGTH, normalizeBarcodeValue } from '../utils/wakeChallenge';
 
 export interface AlarmEditorScreenProps {
   editingAlarm: Alarm | null;
@@ -362,6 +366,8 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   const [soundCategoryFilter, setSoundCategoryFilter] = useState<string>('ALL');
   const [customSounds, setCustomSounds] = useState<CustomSound[]>(() => getCachedCustomSounds());
   const [showCustomSoundModal, setShowCustomSoundModal] = useState<boolean>(false);
+  const [showBarcodeTargetScanner, setShowBarcodeTargetScanner] = useState<boolean>(false);
+  const [barcodeScanError, setBarcodeScanError] = useState<string | null>(null);
 
   useEffect(() => {
     void getCustomSounds().then((sounds) => setCustomSounds(sounds));
@@ -405,6 +411,9 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   };
 
   const snoozeDisplayLabel = useMemo(() => {
+    if (isOutOfBedMission(challenge)) {
+      return amharic ? 'በተልዕኮ ተቆልፏል' : 'Off · out-of-bed mission';
+    }
     if (activeSnoozeInterval === 0 || activeSnoozeLimit === 0) {
       return amharic ? 'ጠፍቷል' : 'Off';
     }
@@ -416,7 +425,7 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
     return amharic
       ? `${activeSnoozeInterval} ደቂቃ, ${activeSnoozeLimit} ጊዜ`
       : `${activeSnoozeInterval} min, ${activeSnoozeLimit} times`;
-  }, [activeSnoozeInterval, activeSnoozeLimit, amharic]);
+  }, [activeSnoozeInterval, activeSnoozeLimit, amharic, challenge]);
 
   const currentTone = RINGTONES_CATALOG.find((tone) => tone.id === sound);
   const customSoundMatch = customSounds.find((cs) => cs.id === sound);
@@ -427,7 +436,7 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
     : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const isDaily = repeatDays.length === 7;
-  const missionCount = challenge === 'none' ? 0 : 1;
+  const missionCount = challenge === 'combo' ? 2 : challenge === 'none' ? 0 : 1;
 
   const [internalDifficulty, setInternalDifficulty] = useState<'easy' | 'medium' | 'hard'>(challengeDifficulty);
   const [internalConfig, setInternalConfig] = useState<Alarm['challengeConfig']>(
@@ -446,6 +455,12 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
     onChallengeConfigChange?.(updated);
   };
 
+  const needsLockedBarcodeTarget = challenge === 'barcode' || challenge === 'combo';
+  const normalizedBarcodeTarget = normalizeBarcodeValue(internalConfig?.barcodeValue);
+  const hasLockedBarcodeTarget = normalizedBarcodeTarget.length > 0 && normalizedBarcodeTarget.length <= MAX_BARCODE_VALUE_LENGTH;
+  const configuredMathCount = getMathQuestionCount(internalConfig);
+  const canSaveAlarm = !needsLockedBarcodeTarget || hasLockedBarcodeTarget;
+
   const updateChallengeDifficulty = (diff: 'easy' | 'medium' | 'hard') => {
     setInternalDifficulty(diff);
     onChallengeDifficultyChange?.(diff);
@@ -453,14 +468,15 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
   const missionOptions: { id: ChallengeType; emoji: string; title: string; badge?: string }[] = [
     { id: 'none', emoji: '🔔', title: amharic ? 'ማጥፊያ ብቻ' : 'Dismiss only' },
-    { id: 'barcode', emoji: '📱', title: amharic ? 'ባርኮድ / QR' : 'Barcode / QR', badge: '🔥 VIRAL' },
-    { id: 'squat', emoji: '🏋️', title: amharic ? 'ስኳት' : 'Squats', badge: '⚡ TIKTOK' },
-    { id: 'steps', emoji: '🚶‍♂️', title: amharic ? 'እርምጃ' : 'Step Walk', badge: '👟 OUT OF BED' },
-    { id: 'photo', emoji: '📸', title: amharic ? 'ፎቶ' : 'Photo Match' },
+    { id: 'combo', emoji: '🚨', title: amharic ? 'ከአልጋ ውጣ' : 'Get up + think', badge: 'BEST' },
+    { id: 'barcode', emoji: '📱', title: amharic ? 'ኮድ ቃኝ' : 'Scan item', badge: 'OUT OF BED' },
+    { id: 'steps', emoji: '🚶‍♂️', title: amharic ? 'እርምጃ' : 'Step Walk', badge: 'NO SNOOZE' },
+    { id: 'squat', emoji: '🏋️', title: amharic ? 'እንቅስቃሴ' : 'Movement reps', badge: 'NO SNOOZE' },
     { id: 'math', emoji: '➗', title: amharic ? 'ሂሳብ' : 'Math' },
-    { id: 'shake', emoji: '📳', title: amharic ? 'አናውጥ' : 'Shake' },
     { id: 'memory', emoji: '🧠', title: amharic ? 'ትውስታ' : 'Memory' },
+    { id: 'shake', emoji: '📳', title: amharic ? 'አናውጥ' : 'Shake' },
     { id: 'typing', emoji: '⌨️', title: amharic ? 'ማረጋገጫ ጽሑፍ' : 'Affirmation' },
+    { id: 'photo', emoji: '📸', title: amharic ? 'የቀጥታ ፎቶ' : 'Photo check' },
   ];
 
   const stopPreview = () => {
@@ -521,6 +537,7 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
   const handleSave = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canSaveAlarm) return;
     onSave();
   };
 
@@ -756,8 +773,13 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
         <section className="mb-4 rounded-[22px] bg-[#1c1c1e] p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[16px] font-medium text-white">{t.wakeUpMission}</h2>
-            <span className="text-[13px] text-slate-500">{missionCount}/5</span>
+            <div>
+              <h2 className="text-[16px] font-medium text-white">{t.wakeUpMission}</h2>
+              <p className="mt-1 text-[11px] text-slate-500">{amharic ? 'ማንቂያውን ለማቆም ስራ ይምረጡ' : 'Choose what it takes to stop the alarm'}</p>
+            </div>
+            <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-bold text-slate-400">
+              {missionCount === 2 ? (amharic ? '2 ደረጃዎች' : '2 stages') : missionCount === 0 ? (amharic ? 'ምንም' : 'No mission') : (amharic ? '1 ተልዕኮ' : '1 mission')}
+            </span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t.wakeUpMission}>
             {missionOptions.map((option) => {
@@ -766,7 +788,10 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
                 <button
                   key={option.id}
                   type="button"
-                  onClick={() => onChallengeChange(option.id)}
+                  onClick={() => {
+                    setShowBarcodeTargetScanner(false);
+                    onChallengeChange(option.id);
+                  }}
                   aria-pressed={selected}
                   className={`flex h-[76px] w-[78px] shrink-0 flex-col items-center justify-center rounded-2xl border text-[11px] font-medium relative transition ${
                     selected
@@ -787,43 +812,131 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
           </div>
 
           {/* Mission Configuration Details */}
-          {challenge === 'barcode' && (
-            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>{amharic ? 'የሚቃኘው እቃ (TikTok #1 ፈተና):' : 'Item to scan (TikTok #1 Viral Mission):'}</span>
-                </span>
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  {amharic ? 'አልጋ ያስለቅቃል' : 'Guaranteed Out of Bed'}
-                </span>
+          {needsLockedBarcodeTarget && (
+            <div className="mt-3.5 space-y-3 border-t border-slate-800/80 pt-3.5" data-testid="barcode-target-setup">
+              <div className="flex items-start gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/15 text-amber-200">
+                  <QrCode className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-black text-amber-200">
+                      {challenge === 'combo'
+                        ? (amharic ? 'ደረጃ 1 · ተመሳሳይ እቃ ቃኝ' : 'STAGE 1 · LOCK AN ITEM')
+                        : (amharic ? 'የተቀመጠውን እቃ ቃኝ' : 'LOCK YOUR BARCODE TARGET')}
+                    </span>
+                    {challenge === 'combo' && <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-black text-emerald-200">NO SNOOZE</span>}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
+                    {amharic
+                      ? 'ከአልጋዎ ርቀው የሚቀመጥ እቃ ይምረጡ። አንድ ጊዜ ካቃኙት በኋላ ማንቂያው ሲጮህ ትክክለኛውን ኮድ እንደገና መቃኘት ያስፈልጋል።'
+                      : 'Pick an item you can leave outside the bedroom. Scan it now; when the alarm rings, only that exact barcode or QR code will pass.'}
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {amharic
-                  ? 'ይህንን እቃ መታጠቢያ ወይም ኩሽና ውስጥ ያስቀምጡ! ማንቂያውን ለማጥፋት እዚያ ሄደው ባርኮዱን በስልክ ካሜራ መቃኘት አለብዎት።'
-                  : 'Keep this barcode in your bathroom or kitchen! When the alarm rings, you must walk out of bed and scan it with the camera to silence it.'}
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
+
+              <div className="grid grid-cols-2 gap-1.5">
                 {[
-                  { label: amharic ? '🪥 የጥርስ ሳሙና' : '🪥 Bathroom Toothpaste', val: 'Bathroom Toothpaste' },
-                  { label: amharic ? '☕ የቡና እቃ' : '☕ Kitchen Coffee Jar', val: 'Kitchen Coffee Jar' },
-                  { label: amharic ? '🧴 የፊት ሳሙና' : '🧴 Face Wash / Soap', val: 'Face Wash / Soap' },
-                  { label: amharic ? '📖 መጽሐፍ' : '📖 Bookshelf Book', val: 'Bookshelf Book' },
+                  { label: amharic ? '🪥 የጥርስ ሳሙና' : '🪥 Toothpaste', val: 'Bathroom Toothpaste' },
+                  { label: amharic ? '☕ የቡና እቃ' : '☕ Coffee jar', val: 'Kitchen Coffee Jar' },
+                  { label: amharic ? '🧴 የፊት ሳሙና' : '🧴 Face wash', val: 'Face Wash / Soap' },
+                  { label: amharic ? '📖 መጽሐፍ' : '📖 Bookshelf book', val: 'Bookshelf Book' },
                 ].map((item) => (
                   <button
                     key={item.val}
                     type="button"
-                    onClick={() => updateChallengeConfig({ barcodeTarget: item.val })}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold text-left transition border ${
+                    onClick={() => {
+                      if ((internalConfig?.barcodeTarget || 'Bathroom Toothpaste') !== item.val) {
+                        updateChallengeConfig({ barcodeTarget: item.val, barcodeValue: '' });
+                      }
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
                       (internalConfig?.barcodeTarget || 'Bathroom Toothpaste') === item.val
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                        : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                        ? 'border-amber-400/50 bg-amber-400/10 text-amber-100'
+                        : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-white'
                     }`}
                   >
                     {item.label}
                   </button>
                 ))}
               </div>
+
+              <div className={`flex items-center gap-2 rounded-xl border p-2.5 text-xs ${hasLockedBarcodeTarget ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100' : 'border-rose-300/25 bg-rose-300/5 text-rose-100'}`}>
+                {hasLockedBarcodeTarget ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" /> : <ShieldCheck className="h-4 w-4 shrink-0 text-rose-200" />}
+                <span className="min-w-0 flex-1 font-bold">
+                  {hasLockedBarcodeTarget
+                    ? (amharic ? `እቃው ተቆልፏል · ••••${normalizeBarcodeValue(internalConfig?.barcodeValue).slice(-4)}` : `Exact item saved · ••••${normalizeBarcodeValue(internalConfig?.barcodeValue).slice(-4)}`)
+                    : (amharic ? 'የባርኮድ ኮድ ያስፈልጋል' : 'Scan the item before saving this mission')}
+                </span>
+                {hasLockedBarcodeTarget && (
+                  <button type="button" onClick={() => updateChallengeConfig({ barcodeValue: '' })} className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-900">
+                    {amharic ? 'አጥፋ' : 'Clear'}
+                  </button>
+                )}
+              </div>
+
+              <label className="block space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{amharic ? 'ባርኮድ / QR ይዘት' : 'Barcode / QR value'}</span>
+                <input
+                  type="text"
+                  maxLength={MAX_BARCODE_VALUE_LENGTH}
+                  autoComplete="off"
+                  value={internalConfig?.barcodeValue ?? ''}
+                  onChange={(event) => updateChallengeConfig({ barcodeValue: event.target.value })}
+                  placeholder={amharic ? 'ከካሜራው ጋር ይቃኙ ወይም ኮዱን ይጻፉ' : 'Scan it or enter the code printed below the bars'}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-300/20"
+                  aria-label={amharic ? 'የባርኮድ ኮድ' : 'Barcode target code'}
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBarcodeScanError(null);
+                    setShowBarcodeTargetScanner((open) => !open);
+                  }}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-300 px-3 py-2 text-xs font-extrabold text-slate-950"
+                >
+                  <Camera className="h-4 w-4" />
+                  {showBarcodeTargetScanner ? (amharic ? 'ካሜራ ዝጋ' : 'Close scanner') : (amharic ? 'እቃውን ቃኝ' : 'Scan target item')}
+                </button>
+                <p className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950/60 px-2 text-center text-[10px] leading-relaxed text-slate-500">
+                  {amharic ? 'ምስሉ አይቀመጥም' : 'No image is saved'}
+                </p>
+              </div>
+
+              {showBarcodeTargetScanner && (
+                <BarcodeScanner
+                  language={language}
+                  title={amharic ? 'ከአልጋዎ ርቀው የሚቀመጠውን እቃ ይቃኙ' : 'Scan the item you will leave away from bed'}
+                  description={amharic ? 'ከሚያነቃቃ ቦታ ውጭ የሆነውን የእቃውን ኮድ ያስቀምጡ።' : 'Aim at the barcode or QR of the exact item you plan to leave in another room.'}
+                  onScan={(value) => {
+                    const normalized = normalizeBarcodeValue(value);
+                    if (!normalized) return;
+                    if (normalized.length > MAX_BARCODE_VALUE_LENGTH) {
+                      setBarcodeScanError(amharic
+                        ? `ይህ ኮድ በጣም ረጅም ነው። እስከ ${MAX_BARCODE_VALUE_LENGTH} ቁምፊ ያለው አጭር ባርኮድ ይጠቀሙ።`
+                        : `This code is too long. Use a barcode or QR code with ${MAX_BARCODE_VALUE_LENGTH} characters or fewer.`);
+                      return;
+                    }
+                    setBarcodeScanError(null);
+                    updateChallengeConfig({ barcodeValue: normalized });
+                    setShowBarcodeTargetScanner(false);
+                  }}
+                />
+              )}
+              {barcodeScanError && (
+                <p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-2.5 text-xs leading-relaxed text-rose-100">
+                  {barcodeScanError}
+                </p>
+              )}
+
+              {challenge === 'combo' && (
+                <p className="rounded-xl border border-slate-700 bg-slate-950/60 p-2.5 text-[10px] leading-relaxed text-slate-400">
+                  {amharic ? `በጠዋት ይህን ኮድ ከቃኙ በኋላ ${configuredMathCount} የሂሳብ ጥያቄዎችን በተከታታይ ይመልሱ። ማሸለብ ጠፍቷል።` : `At wake-up, scan this exact code, then solve a ${configuredMathCount}-answer math streak. Snooze is disabled for this gauntlet.`}
+                </p>
+              )}
             </div>
           )}
 
@@ -834,14 +947,14 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
                   <Dumbbell className="w-3.5 h-3.5" />
                   <span>{amharic ? 'የስኳት ብዛት (TikTok Squat Challenge):' : 'Target Squats (TikTok Squat Challenge):'}</span>
                 </span>
-                <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                  {amharic ? 'የእንቅስቃሴ ዳሳሽ' : 'Motion Verified'}
-                </span>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                    {amharic ? 'የስልክ አቀማመጥ' : 'Phone tilt sensed'}
+                  </span>
               </div>
               <p className="text-[11px] text-slate-300">
                 {amharic
-                  ? 'ካሜራው ወይም የሞባይል ዳሳሹ እያንዳንዱን ስኳት ይቆጥራል። ደም በሰውነትዎ ውስጥ በፍጥነት ይሰራጫል!'
-                  : 'Alarmy motion detector verifies each squat rep in real-time. Blood rushes to your brain instantly!'}
+                  ? 'ከአልጋ ተነስተው ስልኩን ከደረትዎ ጋር ይያዙ። ዳሳሹ የስልኩን ወደ ታች እና ወደ ላይ አቀማመጥ ይከታተላል።'
+                  : 'Get up, hold the phone at your chest, calibrate while standing, then squat slowly. Niqu counts phone tilt cycles, not exercise form.'}
               </p>
               <div className="flex gap-2 pt-1">
                 {[5, 10, 15, 20].map((reps) => (
@@ -869,14 +982,14 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
                   <Footprints className="w-3.5 h-3.5" />
                   <span>{amharic ? 'የእርምጃ ብዛት (Walk Out of Bed):' : 'Target Steps (Walk Out of Bed):'}</span>
                 </span>
-                <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
-                  {amharic ? 'ፔዶሜትር ዳሳሽ' : 'Pedometer Active'}
-                </span>
+                  <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
+                    {amharic ? 'የእንቅስቃሴ ምት' : 'Motion pulses'}
+                  </span>
               </div>
               <p className="text-[11px] text-slate-300">
                 {amharic
-                  ? 'ማንቂያውን ለማጥፋት ከአልጋ ተነስተው የሚፈለገውን እርምጃ መራመድ አለብዎት።'
-                  : 'You must physically walk away from bed. Pedometer sensor counts your footsteps to ensure you stay up!'}
+                  ? 'ከአልጋ ይነሱ እና ስልኩን በእጅዎ ይዘው ይራመዱ። የስልክ እንቅስቃሴ ዳሳሹ የእርምጃ ምቶችን ይቆጥራል።'
+                  : 'Get out of bed and walk with the phone in your hand. Its motion sensor counts step-like movement pulses, not GPS or medical pedometer steps.'}
               </p>
               <div className="flex gap-2 pt-1">
                 {[15, 30, 50, 100].map((stepCount) => (
@@ -900,16 +1013,16 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
           {challenge === 'photo' && (
             <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{amharic ? 'የሚነሳው ቦታ ፎቶ:' : 'Photo Match Target:'}</span>
-                </span>
-                <span className="text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
-                  {amharic ? 'ካሜራ ማረጋገጫ' : 'Camera Match'}
-                </span>
+                  <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{amharic ? 'የቀጥታ ፎቶ ቦታ:' : 'Live Photo Target:'}</span>
+                  </span>
+                  <span className="text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                    {amharic ? 'የራስ ማረጋገጫ' : 'Self-check'}
+                  </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                {amharic ? 'ማንቂያው ሲጮህ የዚህን ቦታ ፎቶ በማንሳት ያጥፉ።' : 'When the alarm rings, take a photo of this spot to confirm you are up.'}
+                {amharic ? 'ቦታው ላይ ሄደው ፎቶ ያንሱ። ኒቁ በምስሉ ውስጥ ያለውን ነገር በራስ-ሰር ማረጋገጥ አይችልም።' : 'Go to this spot and take a live photo. Niqu does not automatically verify what the image shows; barcode lock is stronger proof.'}
               </p>
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 {[
@@ -935,7 +1048,7 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
             </div>
           )}
 
-          {challenge === 'math' && (
+          {(challenge === 'math' || challenge === 'combo') && (
             <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-amber-300">
@@ -1220,6 +1333,7 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
           <Row
             label={amharic ? 'እንቅልፍ' : 'Snooze'}
             value={snoozeDisplayLabel}
+            disabled={isOutOfBedMission(challenge)}
             onClick={() => setShowSnoozeModal(true)}
           />
           <button
@@ -1415,10 +1529,17 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
 
       <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-[#0b0b0d] via-[#0b0b0d] to-transparent">
         <div className="mx-auto max-w-xl px-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
+          {!canSaveAlarm && (
+            <p role="status" className="mb-2 text-center text-[11px] font-semibold text-amber-200">
+              {amharic ? 'ይህንን ጠንካራ ተልዕኮ ለማስቀመጥ ከላይ ያለውን እቃ ይቃኙ።' : 'Scan or enter the exact item code above to save this wake-up mission.'}
+            </p>
+          )}
           <button
             type="submit"
             id="btn-save-alarm"
-            className="flex w-full items-center justify-center rounded-2xl bg-[#ff4d6d] py-[14px] text-[17px] font-semibold text-white shadow-lg shadow-rose-500/20"
+            disabled={!canSaveAlarm}
+            aria-disabled={!canSaveAlarm}
+            className={`flex w-full items-center justify-center rounded-2xl py-[14px] text-[17px] font-semibold text-white shadow-lg transition ${canSaveAlarm ? 'bg-[#ff4d6d] shadow-rose-500/20' : 'cursor-not-allowed bg-slate-700 text-slate-400 shadow-none'}`}
           >
             {t.saveAlarmBtn}
           </button>
@@ -1433,13 +1554,15 @@ const Row: React.FC<{
   value?: string;
   onClick?: () => void;
   switchOn?: boolean;
-}> = ({ label, value, onClick, switchOn }) => (
+  disabled?: boolean;
+}> = ({ label, value, onClick, switchOn, disabled = false }) => (
   <button
     type="button"
     role={switchOn !== undefined ? 'switch' : undefined}
     aria-checked={switchOn !== undefined ? switchOn : undefined}
     onClick={onClick}
-    className="flex w-full items-center justify-between py-3 text-left"
+    disabled={disabled}
+    className={`flex w-full items-center justify-between py-3 text-left ${disabled ? 'cursor-not-allowed opacity-80' : ''}`}
   >
     <span className="flex items-center gap-2 text-[15px] text-white">
       {label}
@@ -1463,7 +1586,7 @@ const Row: React.FC<{
       value && (
         <span className="flex items-center gap-1 text-[14px] text-slate-500">
           {value}
-          <ChevronRight className="h-4 w-4" />
+          {!disabled && <ChevronRight className="h-4 w-4" />}
         </span>
       )
     )}
