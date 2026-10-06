@@ -9,6 +9,7 @@
   const React = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { default: AlarmEditorScreen, getTimeParts, stepHour, to24HourTime } = await import('../src/components/AlarmEditorScreen');
+  const { BarcodeScanner } = await import('../src/components/BarcodeScanner');
   const { createElement: h } = React;
 
   const results: [string, boolean, string][] = [];
@@ -42,6 +43,7 @@
 
   const html = render();
   const repeatMarkup = html.match(/aria-label="Repeat Days">([\s\S]*?)<\/section>/)?.[1] ?? '';
+  const scannerHtml = renderToStaticMarkup(h(BarcodeScanner, { onScan: () => {} }));
 
   // --- One page, no OS time picker or modal backdrop ------------------------
   check('add mode title', html.includes('Wake-up alarm'));
@@ -58,9 +60,10 @@
   check('repeat summary and all seven day buttons', html.includes('Weekdays (Mon-Fri)') && (repeatMarkup.match(/aria-label="(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)"/g) || []).length === 7);
   check('five weekday buttons are selected', (repeatMarkup.match(/aria-pressed="true"/g) || []).length === 5);
   check('alarm name field', html.includes('id="alarm-label-input"') && html.includes('value="Morning Wake Up"'));
-  check('sound row displays the chosen tone', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
-  check('sound choices are available inline', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Sunrise'));
+  check('sound row displays the chosen tone', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Golden Sunrise'));
+  check('sound choices are available inline', html.includes('Sound &amp; Ringtone') && html.includes('Inspirational Golden Sunrise'));
   check('wake-up mission is selectable inline', html.includes('Wake-up mission') && html.includes('aria-label="Wake-up mission"'));
+  check('camera video stays mounted before the scan button is pressed', scannerHtml.includes('<video') && scannerHtml.includes('aria-label="Camera preview"') && scannerHtml.includes('Open camera'));
   check('volume and gentle wake-up controls are retained', html.includes('type="range"') && html.includes('role="switch"'));
 
   // --- Special values, language, and editing modes --------------------------
@@ -72,6 +75,9 @@
   check('weekend repeat label', render({ repeatDays: [0, 6] }).includes('Weekends (Sat-Sun)'));
   check('dismiss-only mission is labelled', render({ challenge: 'none' }).includes('Dismiss only'));
   check('affirmation mission is available', render({ challenge: 'typing' }).includes('Affirmation'));
+  check('gauntlet is offered as the strongest mission', render({ challenge: 'combo' }).includes('Get up + think'));
+  check('gauntlet requires an exact saved barcode before saving', render({ challenge: 'combo' }).includes('disabled=""') && render({ challenge: 'combo' }).includes('barcode-target-setup'));
+  check('a configured barcode mission can be saved', !render({ challenge: 'barcode', challengeConfig: { barcodeValue: '0012345678905' } }).includes('id="btn-save-alarm" disabled=""'));
   check('unknown sound falls back to its id', render({ sound: 'unknown-tone' }).includes('unknown-tone'));
   check('empty label remains editable', render({ label: '' }).includes('id="alarm-label-input"'));
   check('midnight is represented as 12 AM', render({ time: '00:00' }).includes('value="12"') && render({ time: '00:00' }).includes('>AM<'));

@@ -30,6 +30,7 @@ public class AlarmScheduleTest {
             true,
             "math",
             "easy",
+            "8901234567890",
             true
         );
     }
@@ -51,6 +52,7 @@ public class AlarmScheduleTest {
         assertEquals(original.gentleWakeUp, decoded.gentleWakeUp);
         assertEquals(original.challenge, decoded.challenge);
         assertEquals(original.challengeDifficulty, decoded.challengeDifficulty);
+        assertEquals(original.barcodeValue, decoded.barcodeValue);
         assertEquals(original.enabled, decoded.enabled);
         assertTrue(original.isSameAs(decoded));
     }
@@ -68,6 +70,7 @@ public class AlarmScheduleTest {
             false,
             "typing",
             "hard",
+            "QR|morning%值\\nspot",
             true
         );
 
@@ -76,6 +79,7 @@ public class AlarmScheduleTest {
         assertNotNull(decoded);
         assertEquals("id|with|pipes", decoded.id);
         assertEquals("ንቁ | 100% | %7C | line\nbreak", decoded.label);
+        assertEquals("QR|morning%值\\nspot", decoded.barcodeValue);
         assertEquals(23, decoded.hour);
         assertEquals(59, decoded.minute);
         assertEquals(Collections.singletonList(0), decoded.repeatDays());
@@ -123,6 +127,17 @@ public class AlarmScheduleTest {
         assertNull(AlarmSchedule.decode("v1|id|6|30|-|label"));
         assertNull(AlarmSchedule.decode("v1|id|not-an-hour|30|-|label|sound|80|0|math|easy|1"));
         assertNull(AlarmSchedule.decode("v1|id|6|30|9|label|sound|80|0|math|easy|1"));
+        assertNull(AlarmSchedule.decode("v3|id|6|30|-|label|sound|80|0|math|easy|1|code"));
+    }
+
+    @Test
+    public void oldV1AlarmsRemainUsableAfterUpgrade() {
+        AlarmSchedule decoded = AlarmSchedule.decode("v1|old|6|30|1,2,3,4,5|Wake up|sunrise|80|1|math|easy|1");
+        assertNotNull(decoded);
+        assertEquals("old", decoded.id);
+        assertEquals("math", decoded.challenge);
+        assertEquals("", decoded.barcodeValue);
+        assertTrue("legacy schedules are rewritten using the current format", decoded.encode().startsWith("v2|"));
     }
 
     @Test
@@ -159,9 +174,10 @@ public class AlarmScheduleTest {
 
         assertTrue(original.isSameAs(AlarmSchedule.decode(original.encode())));
         assertFalse(original.isSameAs(null));
-        assertFalse("a different time must re-arm", original.isSameAs(AlarmSchedule.fromDayList("alarm-1", 6, 31, Arrays.asList(1, 2, 3, 4, 5), "Morning Rise & Shine", "sunrise", 80, true, "math", "easy", true)));
+        assertFalse("a different time must re-arm", original.isSameAs(AlarmSchedule.fromDayList("alarm-1", 6, 31, Arrays.asList(1, 2, 3, 4, 5), "Morning Rise & Shine", "sunrise", 80, true, "math", "easy", "8901234567890", true)));
         assertFalse("a disabled alarm must be cancelled", original.isSameAs(original.withEnabled(false)));
-        assertFalse("a different sound must refresh the notification", original.isSameAs(AlarmSchedule.fromDayList("alarm-1", 6, 30, Arrays.asList(1, 2, 3, 4, 5), "Morning Rise & Shine", "nuclear", 80, true, "math", "easy", true)));
+        assertFalse("a different sound must refresh the notification", original.isSameAs(AlarmSchedule.fromDayList("alarm-1", 6, 30, Arrays.asList(1, 2, 3, 4, 5), "Morning Rise & Shine", "nuclear", 80, true, "math", "easy", "8901234567890", true)));
+        assertFalse("a different scan target must update the stored challenge", original.isSameAs(AlarmSchedule.fromDayList("alarm-1", 6, 30, Arrays.asList(1, 2, 3, 4, 5), "Morning Rise & Shine", "sunrise", 80, true, "math", "easy", "0001112223334", true)));
     }
 
     @Test

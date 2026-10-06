@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { Alarm, ChallengeType } from '../types';
+import { MAX_BARCODE_VALUE_LENGTH } from './wakeChallenge';
 
 /**
  * Bridge to the native alarm engine of the Android app (Phase 2).
@@ -38,6 +39,8 @@ export interface NativeAlarm {
   gentleWakeUp: boolean;
   challenge: ChallengeType;
   challengeDifficulty: Alarm['challengeDifficulty'];
+  /** The locally saved exact scan target needed to rebuild a cold-start challenge. */
+  barcodeValue?: string;
   enabled: boolean;
 }
 
@@ -54,6 +57,8 @@ export interface RingingAlarmInfo {
   gentleWakeUp: boolean;
   challenge: ChallengeType;
   challengeDifficulty: Alarm['challengeDifficulty'];
+  /** The exact barcode / QR payload, included for native cold starts if local storage is unavailable. */
+  barcodeValue?: string;
   /** Epoch millis when the ring started. */
   startedAt: number;
   ringingSeconds: number;
@@ -171,6 +176,7 @@ export function toNativeAlarm(alarm: Alarm): NativeAlarm {
     gentleWakeUp: Boolean(alarm.gentleWakeUp),
     challenge: alarm.challenge ?? 'math',
     challengeDifficulty: alarm.challengeDifficulty ?? 'easy',
+    barcodeValue: String(alarm.challengeConfig?.barcodeValue ?? '').slice(0, MAX_BARCODE_VALUE_LENGTH),
     enabled: Boolean(alarm.enabled),
   };
 }
@@ -199,6 +205,7 @@ export function alarmFromRingInfo(info: RingingAlarmInfo, alarms: Alarm[]): Alar
     snoozeCount: 0,
     challenge: info.challenge ?? 'math',
     challengeDifficulty: info.challengeDifficulty ?? 'easy',
+    challengeConfig: info.barcodeValue ? { barcodeValue: info.barcodeValue } : undefined,
   };
 }
 
