@@ -13,7 +13,7 @@ import { nativeAlarmScheduler } from '../utils/alarmScheduler';
 import { WALLPAPERS } from './AlarmClock';
 import { Language } from '../utils/translations';
 import { getCachedCustomSound, getCustomSoundById } from '../utils/customSounds';
-import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX, Music } from 'lucide-react';
+import { BellRing, Clock, CheckCircle2, ShieldAlert, Sparkles, Smartphone, Grid, Activity, Volume2, VolumeX, Lock, ShieldX, Music, Camera, Dumbbell, Footprints, QrCode, ScanLine, RotateCcw, Zap } from 'lucide-react';
 
 interface AlarmRingingModalProps {
   alarm: Alarm;

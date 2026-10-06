@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Camera,
   Check,
   ChevronRight,
+  Dumbbell,
+  Footprints,
   Music,
   Pencil,
   Play,
   Plus,
+  QrCode,
   Square,
   Trash2,
   Volume2,
@@ -36,6 +40,10 @@ export interface AlarmEditorScreenProps {
   onGentleWakeUpChange: (gentle: boolean) => void;
   challenge: ChallengeType;
   onChallengeChange: (challenge: ChallengeType) => void;
+  challengeDifficulty?: 'easy' | 'medium' | 'hard';
+  onChallengeDifficultyChange?: (diff: 'easy' | 'medium' | 'hard') => void;
+  challengeConfig?: Alarm['challengeConfig'];
+  onChallengeConfigChange?: (config: Alarm['challengeConfig']) => void;
   snoozeInterval?: number;
   onSnoozeIntervalChange?: (interval: number) => void;
   snoozeLimit?: number;
@@ -320,6 +328,10 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   onGentleWakeUpChange,
   challenge,
   onChallengeChange,
+  challengeDifficulty = 'easy',
+  onChallengeDifficultyChange,
+  challengeConfig,
+  onChallengeConfigChange,
   snoozeInterval,
   onSnoozeIntervalChange,
   snoozeLimit,
@@ -417,12 +429,37 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
   const isDaily = repeatDays.length === 7;
   const missionCount = challenge === 'none' ? 0 : 1;
 
-  const missionOptions: { id: ChallengeType; emoji: string; title: string }[] = [
+  const [internalDifficulty, setInternalDifficulty] = useState<'easy' | 'medium' | 'hard'>(challengeDifficulty);
+  const [internalConfig, setInternalConfig] = useState<Alarm['challengeConfig']>(
+    challengeConfig ?? {
+      barcodeTarget: 'Bathroom Toothpaste',
+      targetSquats: 10,
+      targetSteps: 30,
+      photoTarget: 'Bathroom Sink',
+      mathCount: 3,
+    }
+  );
+
+  const updateChallengeConfig = (partial: Partial<NonNullable<Alarm['challengeConfig']>>) => {
+    const updated = { ...internalConfig, ...partial };
+    setInternalConfig(updated);
+    onChallengeConfigChange?.(updated);
+  };
+
+  const updateChallengeDifficulty = (diff: 'easy' | 'medium' | 'hard') => {
+    setInternalDifficulty(diff);
+    onChallengeDifficultyChange?.(diff);
+  };
+
+  const missionOptions: { id: ChallengeType; emoji: string; title: string; badge?: string }[] = [
     { id: 'none', emoji: '🔔', title: amharic ? 'ማጥፊያ ብቻ' : 'Dismiss only' },
+    { id: 'barcode', emoji: '📱', title: amharic ? 'ባርኮድ / QR' : 'Barcode / QR', badge: '🔥 VIRAL' },
+    { id: 'squat', emoji: '🏋️', title: amharic ? 'ስኳት' : 'Squats', badge: '⚡ TIKTOK' },
+    { id: 'steps', emoji: '🚶‍♂️', title: amharic ? 'እርምጃ' : 'Step Walk', badge: '👟 OUT OF BED' },
+    { id: 'photo', emoji: '📸', title: amharic ? 'ፎቶ' : 'Photo Match' },
     { id: 'math', emoji: '➗', title: amharic ? 'ሂሳብ' : 'Math' },
     { id: 'shake', emoji: '📳', title: amharic ? 'አናውጥ' : 'Shake' },
     { id: 'memory', emoji: '🧠', title: amharic ? 'ትውስታ' : 'Memory' },
-    { id: 'tiles', emoji: '🧩', title: amharic ? 'ቅደም ተከተል' : 'Pattern' },
     { id: 'typing', emoji: '⌨️', title: amharic ? 'ማረጋገጫ ጽሑፍ' : 'Affirmation' },
   ];
 
@@ -731,18 +768,220 @@ const AlarmEditorScreen: React.FC<AlarmEditorScreenProps> = ({
                   type="button"
                   onClick={() => onChallengeChange(option.id)}
                   aria-pressed={selected}
-                  className={`flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-2xl border text-[11px] font-medium ${
+                  className={`flex h-[76px] w-[78px] shrink-0 flex-col items-center justify-center rounded-2xl border text-[11px] font-medium relative transition ${
                     selected
-                      ? 'border-sky-500/70 bg-[#12303a] text-sky-100'
-                      : 'border-[#2f2f33] bg-[#161618] text-slate-500'
+                      ? 'border-amber-500/80 bg-amber-500/15 text-amber-200 shadow-md shadow-amber-500/10'
+                      : 'border-[#2f2f33] bg-[#161618] text-slate-400 hover:text-white'
                   }`}
                 >
-                  {option.id === 'none' ? <span className="text-2xl leading-none">+</span> : <span className="text-lg">{option.emoji}</span>}
-                  <span className="mt-1 truncate px-1">{option.title}</span>
+                  {option.badge && (
+                    <span className="absolute -top-1.5 right-1 px-1 py-0.2 rounded text-[8px] font-black bg-rose-500 text-white tracking-tighter">
+                      {option.badge}
+                    </span>
+                  )}
+                  {option.id === 'none' ? <span className="text-2xl leading-none">+</span> : <span className="text-xl">{option.emoji}</span>}
+                  <span className="mt-1 truncate px-1 font-bold">{option.title}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Mission Configuration Details */}
+          {challenge === 'barcode' && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>{amharic ? 'የሚቃኘው እቃ (TikTok #1 ፈተና):' : 'Item to scan (TikTok #1 Viral Mission):'}</span>
+                </span>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  {amharic ? 'አልጋ ያስለቅቃል' : 'Guaranteed Out of Bed'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {amharic
+                  ? 'ይህንን እቃ መታጠቢያ ወይም ኩሽና ውስጥ ያስቀምጡ! ማንቂያውን ለማጥፋት እዚያ ሄደው ባርኮዱን በስልክ ካሜራ መቃኘት አለብዎት።'
+                  : 'Keep this barcode in your bathroom or kitchen! When the alarm rings, you must walk out of bed and scan it with the camera to silence it.'}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {[
+                  { label: amharic ? '🪥 የጥርስ ሳሙና' : '🪥 Bathroom Toothpaste', val: 'Bathroom Toothpaste' },
+                  { label: amharic ? '☕ የቡና እቃ' : '☕ Kitchen Coffee Jar', val: 'Kitchen Coffee Jar' },
+                  { label: amharic ? '🧴 የፊት ሳሙና' : '🧴 Face Wash / Soap', val: 'Face Wash / Soap' },
+                  { label: amharic ? '📖 መጽሐፍ' : '📖 Bookshelf Book', val: 'Bookshelf Book' },
+                ].map((item) => (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => updateChallengeConfig({ barcodeTarget: item.val })}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold text-left transition border ${
+                      (internalConfig?.barcodeTarget || 'Bathroom Toothpaste') === item.val
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                        : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {challenge === 'squat' && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Dumbbell className="w-3.5 h-3.5" />
+                  <span>{amharic ? 'የስኳት ብዛት (TikTok Squat Challenge):' : 'Target Squats (TikTok Squat Challenge):'}</span>
+                </span>
+                <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                  {amharic ? 'የእንቅስቃሴ ዳሳሽ' : 'Motion Verified'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                {amharic
+                  ? 'ካሜራው ወይም የሞባይል ዳሳሹ እያንዳንዱን ስኳት ይቆጥራል። ደም በሰውነትዎ ውስጥ በፍጥነት ይሰራጫል!'
+                  : 'Alarmy motion detector verifies each squat rep in real-time. Blood rushes to your brain instantly!'}
+              </p>
+              <div className="flex gap-2 pt-1">
+                {[5, 10, 15, 20].map((reps) => (
+                  <button
+                    key={reps}
+                    type="button"
+                    onClick={() => updateChallengeConfig({ targetSquats: reps })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition border ${
+                      (internalConfig?.targetSquats || 10) === reps
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                        : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {reps} {amharic ? 'ስኳት' : 'Squats'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {challenge === 'steps' && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Footprints className="w-3.5 h-3.5" />
+                  <span>{amharic ? 'የእርምጃ ብዛት (Walk Out of Bed):' : 'Target Steps (Walk Out of Bed):'}</span>
+                </span>
+                <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
+                  {amharic ? 'ፔዶሜትር ዳሳሽ' : 'Pedometer Active'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                {amharic
+                  ? 'ማንቂያውን ለማጥፋት ከአልጋ ተነስተው የሚፈለገውን እርምጃ መራመድ አለብዎት።'
+                  : 'You must physically walk away from bed. Pedometer sensor counts your footsteps to ensure you stay up!'}
+              </p>
+              <div className="flex gap-2 pt-1">
+                {[15, 30, 50, 100].map((stepCount) => (
+                  <button
+                    key={stepCount}
+                    type="button"
+                    onClick={() => updateChallengeConfig({ targetSteps: stepCount })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition border ${
+                      (internalConfig?.targetSteps || 30) === stepCount
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                        : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {stepCount} {amharic ? 'እርምጃ' : 'Steps'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {challenge === 'photo' && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{amharic ? 'የሚነሳው ቦታ ፎቶ:' : 'Photo Match Target:'}</span>
+                </span>
+                <span className="text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                  {amharic ? 'ካሜራ ማረጋገጫ' : 'Camera Match'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                {amharic ? 'ማንቂያው ሲጮህ የዚህን ቦታ ፎቶ በማንሳት ያጥፉ።' : 'When the alarm rings, take a photo of this spot to confirm you are up.'}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {[
+                  { label: amharic ? '🚰 የመታጠቢያ ገንዳ' : '🚰 Bathroom Sink', val: 'Bathroom Sink' },
+                  { label: amharic ? '☕ የቡና ማሽን' : '☕ Coffee Machine', val: 'Coffee Machine' },
+                  { label: amharic ? '👟 የጠዋት ጫማ' : '👟 Running Shoes', val: 'Running Shoes' },
+                  { label: amharic ? '🪞 የመታጠቢያ መስታወት' : '🪞 Bathroom Mirror', val: 'Bathroom Mirror' },
+                ].map((loc) => (
+                  <button
+                    key={loc.val}
+                    type="button"
+                    onClick={() => updateChallengeConfig({ photoTarget: loc.val })}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold text-left transition border ${
+                      (internalConfig?.photoTarget || 'Bathroom Sink') === loc.val
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                        : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {loc.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {challenge === 'math' && (
+            <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-amber-300">
+                  {amharic ? 'የሂሳብ ፈተና ቅንብር:' : 'Math Mission Configuration:'}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-400 font-semibold">{amharic ? 'የችግር ደረጃ:' : 'Difficulty tier:'}</span>
+                <div className="flex gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map((diff) => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => updateChallengeDifficulty(diff)}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold capitalize transition border ${
+                        internalDifficulty === diff
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                          : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-400 font-semibold">{amharic ? 'የጥያቄዎች ብዛት:' : 'Number of problems:'}</span>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 5].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => updateChallengeConfig({ mathCount: cnt })}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition border ${
+                        (internalConfig?.mathCount || 3) === cnt
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                          : 'bg-[#141416] text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {cnt} {amharic ? 'ጥያቄ' : 'Problems'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <p className="mb-2 px-1 text-[13px] text-slate-500">{amharic ? 'የማንቂያ ድምፅ' : 'Alarm sound'}</p>

@@ -54,8 +54,15 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
   const [wallpaper, setWallpaper] = useState<WallpaperId>('wakeup_rage');
   const [snoozeInterval, setSnoozeInterval] = useState(5);
   const [snoozeLimit, setSnoozeLimit] = useState(3);
-  const [challenge, setChallenge] = useState<ChallengeType>('math');
+  const [challenge, setChallenge] = useState<ChallengeType>('barcode');
   const [challengeDifficulty, setChallengeDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+  const [challengeConfig, setChallengeConfig] = useState<Alarm['challengeConfig']>({
+    barcodeTarget: 'Bathroom Toothpaste',
+    targetSquats: 10,
+    targetSteps: 30,
+    photoTarget: 'Bathroom Sink',
+    mathCount: 3,
+  });
 
   // FAB Popover Menu & Specialized Modal States
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -128,8 +135,15 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setWallpaper('wakeup_rage');
     setSnoozeInterval(5);
     setSnoozeLimit(3);
-    setChallenge('math');
+    setChallenge('barcode');
     setChallengeDifficulty('easy');
+    setChallengeConfig({
+      barcodeTarget: 'Bathroom Toothpaste',
+      targetSquats: 10,
+      targetSteps: 30,
+      photoTarget: 'Bathroom Sink',
+      mathCount: 3,
+    });
     setIsEditorOpen(true);
     onEditorVisibilityChange?.(true);
   };
@@ -147,6 +161,13 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
     setSnoozeLimit(alarm.snoozeLimit ?? 3);
     setChallenge(alarm.challenge);
     setChallengeDifficulty(alarm.challengeDifficulty);
+    setChallengeConfig(alarm.challengeConfig ?? {
+      barcodeTarget: 'Bathroom Toothpaste',
+      targetSquats: 10,
+      targetSteps: 30,
+      photoTarget: 'Bathroom Sink',
+      mathCount: 3,
+    });
     setIsEditorOpen(true);
     onEditorVisibilityChange?.(true);
   };
@@ -174,6 +195,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         snoozeLimit,
         challenge,
         challengeDifficulty,
+        challengeConfig,
       });
     } else {
       onAddAlarm({
@@ -189,6 +211,7 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         snoozeLimit,
         challenge,
         challengeDifficulty,
+        challengeConfig,
       });
     }
     setIsEditorOpen(false);
@@ -215,6 +238,10 @@ export const AlarmClock: React.FC<AlarmClockProps> = ({
         onGentleWakeUpChange={setGentleWakeUp}
         challenge={challenge}
         onChallengeChange={setChallenge}
+        challengeDifficulty={challengeDifficulty}
+        onChallengeDifficultyChange={setChallengeDifficulty}
+        challengeConfig={challengeConfig}
+        onChallengeConfigChange={setChallengeConfig}
         snoozeInterval={snoozeInterval}
         onSnoozeIntervalChange={setSnoozeInterval}
         snoozeLimit={snoozeLimit}

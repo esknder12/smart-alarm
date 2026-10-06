@@ -121,7 +121,18 @@ export const RINGTONES_CATALOG: RingtoneOption[] = [
   { id: 'marimba', title: 'Marimba Morning Dance', subtitle: 'Warm Tropical Wooden Percussion', category: 'Scenery & Relax', emoji: '🪵' },
 ];
 
-export type ChallengeType = 'none' | 'math' | 'typing' | 'memory' | 'shake' | 'tiles';
+export type ChallengeType =
+  | 'none'
+  | 'barcode'
+  | 'photo'
+  | 'squat'
+  | 'steps'
+  | 'math'
+  | 'typing'
+  | 'memory'
+  | 'shake'
+  | 'tiles'
+  | 'combo';
 
 export type WallpaperId =
   | 'wakeup_rage'
@@ -278,6 +289,13 @@ export interface Alarm {
   snoozeLimit?: number; // e.g. 1, 2, 3, 5, 10, 99=unlimited (default 3)
   challenge: ChallengeType;
   challengeDifficulty: 'easy' | 'medium' | 'hard';
+  challengeConfig?: {
+    barcodeTarget?: string;
+    targetSquats?: number;
+    targetSteps?: number;
+    photoTarget?: string;
+    mathCount?: number;
+  };
 }
 
 export interface RoutineStep {
